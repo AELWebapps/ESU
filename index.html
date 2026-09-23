@@ -307,7 +307,7 @@
                 <span class="num-badge">1</span>
                 <span class="field-label">技術員姓名</span>
             </div>
-            <input type="text" id="techNameInput" class="input" placeholder="請輸入姓名 (選填，例如：張大明)">
+            <input type="text" id="techNameInput" class="input" placeholder="請輸入姓名 (選填，例如：張大明)" onchange="saveWorkerName(this.value)">
 
             <div class="label-container">
                 <span class="num-badge">2</span>
@@ -373,7 +373,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -382,7 +382,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機拍攝頁面 -->
+    <!-- 相機連續拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -391,7 +391,7 @@
                 <span class="num-badge">👤</span>
                 <span class="field-label">技術員姓名</span>
             </div>
-            <input type="text" id="cameraTechNameInput" class="input" placeholder="請輸入技術員姓名 (選填)">
+            <input type="text" id="cameraTechNameInput" class="input" placeholder="請輸入技術員姓名 (選填)" onchange="saveWorkerName(this.value)">
 
             <div class="label-container">
                 <span class="num-badge">📍</span>
@@ -507,14 +507,37 @@
     let standaloneGpsData = null;
     let serviceGpsData = null;
 
-    // 背景靜態裝置偵測函式 (對使用者隱藏)
+    // 儲存技術員姓名至 localStorage 並同步更新畫面輸入框
+    function saveWorkerName(name) {
+        if (name) {
+            localStorage.setItem('ael_worker_name', name);
+            syncWorkerNameFields(name);
+        }
+    }
+
+    // 將儲存的姓名填入各相關欄位
+    function syncWorkerNameFields(name) {
+        const checkinInput = document.getElementById('techNameInput');
+        const cameraInput = document.getElementById('cameraTechNameInput');
+        if (checkinInput && checkinInput.value !== name) checkinInput.value = name;
+        if (cameraInput && cameraInput.value !== name) cameraInput.value = name;
+    }
+
+    // 載入已儲存的技術員姓名
+    function loadSavedWorkerName() {
+        const savedName = localStorage.getItem('ael_worker_name');
+        if (savedName) {
+            syncWorkerNameFields(savedName);
+        }
+    }
+
+    // 背景靜態裝置偵測函式
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let deviceType = "Desktop";
         let os = "Unknown";
         let browser = "Unknown";
 
-        // 偵測作業系統與裝置種類
         if (/android/i.test(ua)) {
             os = "Android";
             deviceType = "Mobile";
@@ -533,7 +556,6 @@
             deviceType = "Mobile";
         }
 
-        // 偵測瀏覽器
         if (/chrome|crios|crmo/i.test(ua) && !/edg|opr\//i.test(ua)) {
             browser = "Chrome";
         } else if (/safari/i.test(ua) && !/chrome|crios|crmo/i.test(ua)) {
@@ -555,12 +577,14 @@
         };
     }
 
+    // 驗證與自動記住密碼
     function verifyPassword() {
         const inputVal = document.getElementById('passwordInput').value;
         const errDiv = document.getElementById('loginError');
         
         if (inputVal === APP_PASSWORD) {
             errDiv.style.display = 'none';
+            localStorage.setItem('ael_auth_authenticated', 'true');
             autoFillAndGoToCamera();
         } else {
             errDiv.style.display = 'block';
@@ -776,7 +800,9 @@
     }
 
     async function submitCheckIn() {
-        const name = document.getElementById('techNameInput').value.trim() || '未填寫';
+        const nameInput = document.getElementById('techNameInput');
+        const name = nameInput.value.trim() || '未填寫';
+        saveWorkerName(name);
 
         const checkInRecord = {
             techName: name,
@@ -788,7 +814,6 @@
 
         await addRecord(STORES.checkIns, checkInRecord);
         alert(`✅ 技術員 [${name}] 簽到成功！`);
-        document.getElementById('techNameInput').value = '';
         showPage('home');
     }
 
@@ -850,7 +875,9 @@
 
         try {
             const data = JSON.parse(decodedText);
-            if (data.techName) document.getElementById('cameraTechNameInput').value = data.techName;
+            if (data.techName) {
+                saveWorkerName(data.techName);
+            }
             if (data.site) setSelectValue('siteSelect', data.site);
             if (data.machine) setSelectValue('machineSelect', data.machine);
             if (data.machineId) setSelectValue('machineIdSelect', data.machineId);
@@ -957,6 +984,8 @@
         if (tempPhotoArray.length === 0) { alert('請至少選擇或拍攝一張照片！'); return; }
 
         const techName = document.getElementById('cameraTechNameInput').value.trim() || '未填寫';
+        saveWorkerName(techName);
+
         const gpsText = serviceGpsData 
             ? `${serviceGpsData.latitude.toFixed(4)}, ${serviceGpsData.longitude.toFixed(4)} (±${serviceGpsData.accuracy ? serviceGpsData.accuracy.toFixed(1) + 'm' : '未知'})` 
             : '未取得定位';
@@ -1005,6 +1034,8 @@
 
     async function confirmAndUploadPhotos() {
         const techName = document.getElementById('cameraTechNameInput').value.trim() || "未填寫";
+        saveWorkerName(techName);
+
         const site = document.getElementById('siteSelect').value;
         const machine = document.getElementById('machineSelect').value;
         const machineId = document.getElementById('machineIdSelect').value;
@@ -1084,7 +1115,9 @@
         const hasEmbedParams = techName || site || machine || machineId || workOrder;
 
         if (hasEmbedParams) {
-            if (techName) document.getElementById('cameraTechNameInput').value = techName;
+            if (techName) {
+                saveWorkerName(techName);
+            }
             if (site) setSelectValue('siteSelect', site);
             if (machine) setSelectValue('machineSelect', machine);
             if (machineId) setSelectValue('machineIdSelect', machineId);
@@ -1095,6 +1128,16 @@
             showPage('home');
         }
     }
+
+    // 頁面初始化與自動登入檢查
+    window.addEventListener('DOMContentLoaded', () => {
+        loadSavedWorkerName();
+
+        const isAuth = localStorage.getItem('ael_auth_authenticated');
+        if (isAuth === 'true') {
+            autoFillAndGoToCamera();
+        }
+    });
 
     openDB().then(() => {
         refreshServiceSelects();
