@@ -373,7 +373,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -382,7 +382,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機連續拍攝頁面 -->
+    <!-- 相機拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -403,19 +403,23 @@
             <video id="cameraFeed" autoplay playsinline style="width:100%; height:200px; background:#0f172a; border-radius:10px; margin-top:6px;"></video>
             <canvas id="cameraCanvas" hidden></canvas>
             
-            <div class="label-container">
+            <div class="grid2" style="margin-top: 10px;">
+                <button class="btn warning" onclick="capturePhoto()">📸 拍攝一張</button>
+                <button class="btn secondary" onclick="triggerCameraFileInput()">📁 從裝置選擇照片</button>
+                <input type="file" id="cameraFileInput" accept="image/*" multiple style="display:none" onchange="handleCameraFileUpload(event)">
+            </div>
+
+            <div class="label-container" style="margin-top: 14px;">
                 <span class="num-badge">✓</span>
-                <span class="field-label">已拍攝列表 (<span id="capturedCount">0</span> 張):</span>
+                <span class="field-label">已選擇／拍攝列表 (<span id="capturedCount">0</span> 張):</span>
             </div>
             <div id="capturedPreviewGrid" class="photo-grid"></div>
         </div>
 
         <div class="grid2">
-            <button class="btn warning" onclick="capturePhoto()">📸 拍攝一張</button>
             <button class="btn primary" onclick="goToConfirmPage()">✅ 完成並確認</button>
+            <button class="btn danger" onclick="showPage('service')">取消返回</button>
         </div>
-        <br>
-        <button class="btn danger" onclick="showPage('service')">取消返回</button>
     </div>
 
     <!-- 確認頁面 -->
@@ -502,6 +506,54 @@
     let html5QrcodeScanner = null;
     let standaloneGpsData = null;
     let serviceGpsData = null;
+
+    // 背景靜態裝置偵測函式 (對使用者隱藏)
+    function getDeviceInfo() {
+        const ua = navigator.userAgent;
+        let deviceType = "Desktop";
+        let os = "Unknown";
+        let browser = "Unknown";
+
+        // 偵測作業系統與裝置種類
+        if (/android/i.test(ua)) {
+            os = "Android";
+            deviceType = "Mobile";
+        } else if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+            os = "iOS";
+            deviceType = (navigator.platform === 'MacIntel' || /iPad/.test(ua)) ? "Tablet" : "Mobile";
+        } else if (/Windows/i.test(ua)) {
+            os = "Windows";
+        } else if (/Macintosh/i.test(ua)) {
+            os = "macOS";
+        } else if (/Linux/i.test(ua)) {
+            os = "Linux";
+        }
+
+        if (/mobile/i.test(ua) && deviceType === "Desktop") {
+            deviceType = "Mobile";
+        }
+
+        // 偵測瀏覽器
+        if (/chrome|crios|crmo/i.test(ua) && !/edg|opr\//i.test(ua)) {
+            browser = "Chrome";
+        } else if (/safari/i.test(ua) && !/chrome|crios|crmo/i.test(ua)) {
+            browser = "Safari";
+        } else if (/edg/i.test(ua)) {
+            browser = "Edge";
+        } else if (/firefox|fxios/i.test(ua)) {
+            browser = "Firefox";
+        }
+
+        return {
+            type: deviceType,
+            os: os,
+            browser: browser,
+            screenWidth: window.screen ? window.screen.width : null,
+            screenHeight: window.screen ? window.screen.height : null,
+            isTouch: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
+            userAgent: ua
+        };
+    }
 
     function verifyPassword() {
         const inputVal = document.getElementById('passwordInput').value;
@@ -729,6 +781,7 @@
         const checkInRecord = {
             techName: name,
             gps: standaloneGpsData,
+            deviceInfo: getDeviceInfo(),
             timestamp: new Date().toISOString(),
             synced: false
         };
@@ -859,6 +912,30 @@
         updateCapturedPreview();
     }
 
+    function triggerCameraFileInput() {
+        document.getElementById('cameraFileInput').click();
+    }
+
+    function handleCameraFileUpload(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+
+        let loadedCount = 0;
+
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                tempPhotoArray.push(e.target.result);
+                loadedCount++;
+                if (loadedCount === files.length) {
+                    updateCapturedPreview();
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+        event.target.value = '';
+    }
+
     function updateCapturedPreview() {
         document.getElementById('capturedCount').textContent = tempPhotoArray.length;
         const grid = document.getElementById('capturedPreviewGrid');
@@ -877,7 +954,7 @@
     }
 
     function goToConfirmPage() {
-        if (tempPhotoArray.length === 0) { alert('請至少拍攝一張照片！'); return; }
+        if (tempPhotoArray.length === 0) { alert('請至少選擇或拍攝一張照片！'); return; }
 
         const techName = document.getElementById('cameraTechNameInput').value.trim() || '未填寫';
         const gpsText = serviceGpsData 
@@ -934,6 +1011,7 @@
         const workOrder = document.getElementById('workOrderInput').value || "無工作編號";
         const issueType = document.getElementById('issueTypeSelect').value;
         const timestamp = new Date().toISOString();
+        const deviceInfo = getDeviceInfo();
 
         if (tempPhotoArray.length === 0) {
             alert("沒有可儲存的照片！");
@@ -955,7 +1033,8 @@
             issueType: issueType,
             photoBase64: photoBase64,
             photoIndex: index + 1,
-            timestamp: timestamp
+            timestamp: timestamp,
+            deviceInfo: deviceInfo
         }));
 
         try {
