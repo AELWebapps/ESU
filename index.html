@@ -89,6 +89,25 @@
             margin-bottom: 12px;
         }
 
+        .suggestion-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #e2e8f0;
+            border: 1px solid #94a3b8;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #0f172a;
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: background 0.2s;
+        }
+
+        .suggestion-chip:hover {
+            background: #cbd5e1;
+        }
+
         .input { 
             width: 100%; 
             padding: 12px; 
@@ -253,7 +272,13 @@
                 <span class="num-badge">🔑</span>
                 <span class="field-label">密碼</span>
             </div>
-            <input type="password" id="passwordInput" class="input" placeholder="請輸入 8 位數密碼" onkeyup="checkEnterKey(event)">
+
+            <!-- Password Suggestion Chip -->
+            <div id="pwdSuggestionChip" class="suggestion-chip" style="display:none;" onclick="useSavedPassword()">
+                💡 建議使用已儲存的密碼: <strong id="suggestedPwdText">••••••••</strong> (點擊填入)
+            </div>
+
+            <input type="password" id="passwordInput" class="input" placeholder="請輸入 8 位數密碼" autocomplete="current-password" onkeyup="checkEnterKey(event)">
             <div id="loginError" class="error-message">❌ 密碼錯誤，請重新輸入。</div>
             
             <br>
@@ -278,6 +303,7 @@
                 ☁️ 雲端同步中心 
                 <span id="unsyncedBadge" class="sync-badge" style="display:none;">0 待同步</span>
             </button>
+            <button class="btn danger" style="padding: 8px; font-size: 12px; margin-top: 8px;" onclick="resetSavedCredentials()">⚙️ 清除已儲存的密碼／技術員紀錄</button>
         </div>
     </div>
 
@@ -307,7 +333,14 @@
                 <span class="num-badge">1</span>
                 <span class="field-label">技術員姓名</span>
             </div>
-            <input type="text" id="techNameInput" class="input" placeholder="請輸入姓名 (選填，例如：張大明)" onchange="saveWorkerName(this.value)">
+
+            <!-- Worker Name Suggestion Chip -->
+            <div id="workerSuggestionChip1" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('techNameInput')">
+                💡 建議使用已儲存姓名: <strong id="suggestedWorkerText1"></strong> (點擊填入)
+            </div>
+
+            <input type="text" id="techNameInput" class="input" list="workerSuggestionsList" placeholder="請輸入姓名 (例如：張大明)" onchange="saveWorkerName(this.value)">
+            <datalist id="workerSuggestionsList"></datalist>
 
             <div class="label-container">
                 <span class="num-badge">2</span>
@@ -373,7 +406,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -382,7 +415,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機拍攝頁面 -->
+    <!-- 相機連續拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -391,7 +424,13 @@
                 <span class="num-badge">👤</span>
                 <span class="field-label">技術員姓名</span>
             </div>
-            <input type="text" id="cameraTechNameInput" class="input" placeholder="請輸入技術員姓名 (選填)" onchange="saveWorkerName(this.value)">
+
+            <!-- Worker Name Suggestion Chip 2 -->
+            <div id="workerSuggestionChip2" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('cameraTechNameInput')">
+                💡 建議使用已儲存姓名: <strong id="suggestedWorkerText2"></strong> (點擊填入)
+            </div>
+
+            <input type="text" id="cameraTechNameInput" class="input" list="workerSuggestionsList" placeholder="請輸入技術員姓名" onchange="saveWorkerName(this.value)">
 
             <div class="label-container">
                 <span class="num-badge">📍</span>
@@ -507,27 +546,107 @@
     let standaloneGpsData = null;
     let serviceGpsData = null;
 
-    // 儲存技術員姓名至 localStorage 並同步更新畫面輸入框
-    function saveWorkerName(name) {
-        if (name) {
-            localStorage.setItem('ael_worker_name', name);
-            syncWorkerNameFields(name);
+    // --- 密碼與技術員記憶及建議 (STORAGE & SUGGESTION HELPERS) ---
+
+    // 儲存密碼
+    function savePassword(pwd) {
+        if (pwd) {
+            localStorage.setItem('ael_saved_password', pwd);
         }
     }
 
-    // 將儲存的姓名填入各相關欄位
+    // 使用建議密碼填入
+    function useSavedPassword() {
+        const savedPwd = localStorage.getItem('ael_saved_password');
+        if (savedPwd) {
+            document.getElementById('passwordInput').value = savedPwd;
+        }
+    }
+
+    // 顯示密碼建議提示
+    function checkPasswordSuggestion() {
+        const savedPwd = localStorage.getItem('ael_saved_password');
+        const chip = document.getElementById('pwdSuggestionChip');
+        if (savedPwd) {
+            chip.style.display = 'inline-flex';
+            // 自動預填密碼欄位作為建議
+            document.getElementById('passwordInput').value = savedPwd;
+        } else {
+            chip.style.display = 'none';
+        }
+    }
+
+    // 儲存技術員姓名至 localStorage 並同步更新建議 datalist
+    function saveWorkerName(name) {
+        if (name && name.trim()) {
+            const cleanName = name.trim();
+            localStorage.setItem('ael_worker_name', cleanName);
+            syncWorkerNameFields(cleanName);
+            updateWorkerSuggestions(cleanName);
+        }
+    }
+
+    // 自動填入姓名建議
+    function useSavedWorkerName(inputId) {
+        const savedName = localStorage.getItem('ael_worker_name');
+        if (savedName) {
+            const el = document.getElementById(inputId);
+            if (el) el.value = savedName;
+        }
+    }
+
+    // 更新各欄位與建議 Chips
     function syncWorkerNameFields(name) {
         const checkinInput = document.getElementById('techNameInput');
         const cameraInput = document.getElementById('cameraTechNameInput');
-        if (checkinInput && checkinInput.value !== name) checkinInput.value = name;
-        if (cameraInput && cameraInput.value !== name) cameraInput.value = name;
+        if (checkinInput) checkinInput.value = name;
+        if (cameraInput) cameraInput.value = name;
+
+        // 更新晶片文字與顯示
+        const chip1 = document.getElementById('workerSuggestionChip1');
+        const chip2 = document.getElementById('workerSuggestionChip2');
+        const txt1 = document.getElementById('suggestedWorkerText1');
+        const txt2 = document.getElementById('suggestedWorkerText2');
+
+        if (name) {
+            if (txt1) txt1.textContent = name;
+            if (txt2) txt2.textContent = name;
+            if (chip1) chip1.style.display = 'inline-flex';
+            if (chip2) chip2.style.display = 'inline-flex';
+        }
     }
 
-    // 載入已儲存的技術員姓名
-    function loadSavedWorkerName() {
+    // 更新 `<datalist>` 自動建議清單
+    function updateWorkerSuggestions(name) {
+        const datalist = document.getElementById('workerSuggestionsList');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        if (name) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.label = '（上次使用的技術員）';
+            datalist.appendChild(opt);
+        }
+    }
+
+    // 載入已儲存資料
+    function loadSavedCredentials() {
         const savedName = localStorage.getItem('ael_worker_name');
         if (savedName) {
             syncWorkerNameFields(savedName);
+            updateWorkerSuggestions(savedName);
+        }
+        checkPasswordSuggestion();
+    }
+
+    // 清除記憶資料
+    function resetSavedCredentials() {
+        if (confirm('確定要清除已儲存的密碼與技術員姓名嗎？')) {
+            localStorage.removeItem('ael_auth_authenticated');
+            localStorage.removeItem('ael_saved_password');
+            localStorage.removeItem('ael_worker_name');
+            alert('已成功清除紀錄！');
+            location.reload();
         }
     }
 
@@ -585,6 +704,7 @@
         if (inputVal === APP_PASSWORD) {
             errDiv.style.display = 'none';
             localStorage.setItem('ael_auth_authenticated', 'true');
+            savePassword(inputVal); // 記住密碼
             autoFillAndGoToCamera();
         } else {
             errDiv.style.display = 'block';
@@ -1131,7 +1251,7 @@
 
     // 頁面初始化與自動登入檢查
     window.addEventListener('DOMContentLoaded', () => {
-        loadSavedWorkerName();
+        loadSavedCredentials();
 
         const isAuth = localStorage.getItem('ael_auth_authenticated');
         if (isAuth === 'true') {
