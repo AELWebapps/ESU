@@ -362,7 +362,10 @@
         <div class="card">
             <h3>📷 QR Code 自動填寫資料</h3>
             <div id="qr-reader" style="display:none;"></div>
-            <button id="toggleQrBtn" class="btn warning" onclick="toggleQrScanner()">開啟相機掃描 QR Code</button>
+            <div class="grid2" style="margin-bottom: 8px;">
+                <button id="toggleQrBtn" class="btn warning" onclick="toggleQrScanner()">開啟相機掃描 QR Code</button>
+                <button id="switchQrCameraBtn" class="btn secondary" style="display:none;" onclick="switchQrCamera()">🔄 切換前/後鏡頭</button>
+            </div>
         </div>
 
         <div class="card">
@@ -444,6 +447,9 @@
             
             <div class="grid2" style="margin-top: 10px;">
                 <button class="btn warning" onclick="capturePhoto()">📸 拍攝一張</button>
+                <button class="btn info" onclick="toggleCameraFacingMode()">🔄 切換前/後鏡頭</button>
+            </div>
+            <div style="margin-top: 8px;">
                 <button class="btn secondary" onclick="triggerCameraFileInput()">📁 從裝置選擇照片</button>
                 <input type="file" id="cameraFileInput" accept="image/*" multiple style="display:none" onchange="handleCameraFileUpload(event)">
             </div>
@@ -543,10 +549,10 @@
     let db = null;
     let tempPhotoArray = [];
     let html5QrcodeScanner = null;
+    let qrFacingMode = "environment"; // default back camera for QR
+    let photoFacingMode = "environment"; // default back camera for photo taking
     let standaloneGpsData = null;
     let serviceGpsData = null;
-
-    // --- 密碼與技術員記憶及建議 (STORAGE & SUGGESTION HELPERS) ---
 
     function savePassword(pwd) {
         if (pwd) {
@@ -946,23 +952,38 @@
         });
     }
 
+    // --- QR SCANNER WITH FRONT/BACK CAMERA SWITCH ---
+    function startQrScanner() {
+        const qrContainer = document.getElementById('qr-reader');
+        qrContainer.style.display = 'block';
+        document.getElementById('toggleQrBtn').textContent = '關閉 QR Code 掃描器';
+        document.getElementById('switchQrCameraBtn').style.display = 'block';
+
+        html5QrcodeScanner = new Html5Qrcode("qr-reader");
+        html5QrcodeScanner.start(
+            { facingMode: qrFacingMode },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onScanSuccess,
+            onScanFailure
+        ).catch(err => alert('無法啟動 QR 掃描器: ' + err));
+    }
+
     function toggleQrScanner() {
         const qrContainer = document.getElementById('qr-reader');
-        const btn = document.getElementById('toggleQrBtn');
 
         if (qrContainer.style.display === 'none') {
-            qrContainer.style.display = 'block';
-            btn.textContent = '關閉 QR Code 掃描器';
-            
-            html5QrcodeScanner = new Html5Qrcode("qr-reader");
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                onScanSuccess,
-                onScanFailure
-            );
+            startQrScanner();
         } else {
             stopQrScanner();
+        }
+    }
+
+    function switchQrCamera() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                qrFacingMode = (qrFacingMode === "environment") ? "user" : "environment";
+                startQrScanner();
+            }).catch(err => console.error(err));
         }
     }
 
@@ -971,6 +992,7 @@
             html5QrcodeScanner.stop().then(() => {
                 document.getElementById('qr-reader').style.display = 'none';
                 document.getElementById('toggleQrBtn').textContent = '開啟相機掃描 QR Code';
+                document.getElementById('switchQrCameraBtn').style.display = 'none';
                 html5QrcodeScanner = null;
             }).catch(err => console.error(err));
         }
@@ -1009,6 +1031,7 @@
         }
     }
 
+    // --- PHOTO CAPTURE WITH FRONT/BACK CAMERA SWITCH ---
     let cameraStream = null;
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('cameraCanvas');
@@ -1022,12 +1045,11 @@
         }
     }
 
-    // UPDATED: Request native camera resolution
     function startCamera() {
         stopCamera();
         const constraints = {
             video: {
-                facingMode: 'environment',
+                facingMode: photoFacingMode,
                 width: { ideal: 4096 },
                 height: { ideal: 2160 }
             }
@@ -1042,17 +1064,20 @@
             .catch(err => alert('無法開啟相機: ' + err.message));
     }
 
+    function toggleCameraFacingMode() {
+        photoFacingMode = (photoFacingMode === "environment") ? "user" : "environment";
+        startCamera();
+    }
+
     function prepareAndShowCamera() {
         tempPhotoArray = [];
         updateCapturedPreview();
         showPage('camera');
     }
 
-    // UPDATED: Draw photo with full camera resolution
     function capturePhoto() {
         if (!cameraStream) { alert('請先開啟鏡頭。'); return; }
         
-        // Dynamically match canvas size to camera's raw output resolution
         const nativeWidth = video.videoWidth || 1920;
         const nativeHeight = video.videoHeight || 1080;
         
@@ -1159,7 +1184,6 @@
         event.target.value = '';
     }
 
-    // --- UPDATED POST FUNCTION WITH WORKER NAME & GPS IN SINGLE JSON PAYLOAD ---
     async function confirmAndUploadPhotos() {
         const techName = document.getElementById('cameraTechNameInput').value.trim() || "未填寫";
         saveWorkerName(techName);
@@ -1182,13 +1206,11 @@
         saveBtn.disabled = true;
         saveBtn.textContent = "⏳ 正在透過 Power Automate 上傳中...";
 
-        // Form photo list with index and base64 strings
         const photoItems = tempPhotoArray.map((photoBase64, index) => ({
             photoIndex: index + 1,
             photoBase64: photoBase64
         }));
 
-        // Single JSON Payload with Worker Name, GPS, Metadata, and Photo Array
         const payload = {
             techName: techName,
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
@@ -1203,7 +1225,6 @@
         };
 
         try {
-            // Save to local IndexedDB backup
             for (const item of photoItems) {
                 await addRecord(STORES.photos, {
                     ...payload,
@@ -1213,7 +1234,6 @@
                 });
             }
 
-            // HTTP POST payload to Power Automate
             const response = await fetch(POWER_AUTOMATE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1270,7 +1290,6 @@
         }
     }
 
-    // 頁面初始化與自動登入檢查
     window.addEventListener('DOMContentLoaded', () => {
         loadSavedCredentials();
 
