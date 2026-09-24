@@ -273,7 +273,6 @@
                 <span class="field-label">密碼</span>
             </div>
 
-            <!-- Password Suggestion Chip -->
             <div id="pwdSuggestionChip" class="suggestion-chip" style="display:none;" onclick="useSavedPassword()">
                 💡 建議使用已儲存的密碼: <strong id="suggestedPwdText">••••••••</strong> (點擊填入)
             </div>
@@ -334,7 +333,6 @@
                 <span class="field-label">技術員姓名</span>
             </div>
 
-            <!-- Worker Name Suggestion Chip -->
             <div id="workerSuggestionChip1" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('techNameInput')">
                 💡 建議使用已儲存姓名: <strong id="suggestedWorkerText1"></strong> (點擊填入)
             </div>
@@ -409,7 +407,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -418,7 +416,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機拍攝頁面 -->
+    <!-- 相機連續拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -428,7 +426,6 @@
                 <span class="field-label">技術員姓名</span>
             </div>
 
-            <!-- Worker Name Suggestion Chip 2 -->
             <div id="workerSuggestionChip2" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('cameraTechNameInput')">
                 💡 建議使用已儲存姓名: <strong id="suggestedWorkerText2"></strong> (點擊填入)
             </div>
@@ -549,8 +546,8 @@
     let db = null;
     let tempPhotoArray = [];
     let html5QrcodeScanner = null;
-    let qrFacingMode = "environment"; // default back camera for QR
-    let photoFacingMode = "environment"; // default back camera for photo taking
+    let qrFacingMode = "environment";
+    let photoFacingMode = "environment";
     let standaloneGpsData = null;
     let serviceGpsData = null;
 
@@ -952,7 +949,6 @@
         });
     }
 
-    // --- QR SCANNER WITH FRONT/BACK CAMERA SWITCH ---
     function startQrScanner() {
         const qrContainer = document.getElementById('qr-reader');
         qrContainer.style.display = 'block';
@@ -1003,14 +999,32 @@
         alert('解析 QR Code 成功！');
 
         try {
-            const data = JSON.parse(decodedText);
-            if (data.techName) {
-                saveWorkerName(data.techName);
+            if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
+                const url = new URL(decodedText);
+                const params = url.searchParams;
+
+                const site = params.get('site');
+                const machine = params.get('machine');
+                const machineId = params.get('machineId');
+                const workOrder = params.get('workOrder');
+                const techName = params.get('techName');
+
+                if (techName) saveWorkerName(techName);
+                if (site) setSelectValue('siteSelect', site);
+                if (machine) setSelectValue('machineSelect', machine);
+                if (machineId) setSelectValue('machineIdSelect', machineId);
+                if (workOrder) document.getElementById('workOrderInput').value = workOrder;
+
+                return;
             }
+
+            const data = JSON.parse(decodedText);
+            if (data.techName) saveWorkerName(data.techName);
             if (data.site) setSelectValue('siteSelect', data.site);
             if (data.machine) setSelectValue('machineSelect', data.machine);
             if (data.machineId) setSelectValue('machineIdSelect', data.machineId);
             if (data.workOrder) document.getElementById('workOrderInput').value = data.workOrder;
+
         } catch (e) {
             const delimiter = decodedText.includes('|') ? '|' : (decodedText.includes(',') ? ',' : '\n');
             const parts = decodedText.split(delimiter).map(p => p.trim());
@@ -1031,7 +1045,6 @@
         }
     }
 
-    // --- PHOTO CAPTURE WITH FRONT/BACK CAMERA SWITCH ---
     let cameraStream = null;
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('cameraCanvas');
