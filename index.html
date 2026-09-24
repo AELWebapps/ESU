@@ -548,14 +548,12 @@
 
     // --- 密碼與技術員記憶及建議 (STORAGE & SUGGESTION HELPERS) ---
 
-    // 儲存密碼
     function savePassword(pwd) {
         if (pwd) {
             localStorage.setItem('ael_saved_password', pwd);
         }
     }
 
-    // 使用建議密碼填入
     function useSavedPassword() {
         const savedPwd = localStorage.getItem('ael_saved_password');
         if (savedPwd) {
@@ -563,20 +561,17 @@
         }
     }
 
-    // 顯示密碼建議提示
     function checkPasswordSuggestion() {
         const savedPwd = localStorage.getItem('ael_saved_password');
         const chip = document.getElementById('pwdSuggestionChip');
         if (savedPwd) {
             chip.style.display = 'inline-flex';
-            // 自動預填密碼欄位作為建議
             document.getElementById('passwordInput').value = savedPwd;
         } else {
             chip.style.display = 'none';
         }
     }
 
-    // 儲存技術員姓名至 localStorage 並同步更新建議 datalist
     function saveWorkerName(name) {
         if (name && name.trim()) {
             const cleanName = name.trim();
@@ -586,7 +581,6 @@
         }
     }
 
-    // 自動填入姓名建議
     function useSavedWorkerName(inputId) {
         const savedName = localStorage.getItem('ael_worker_name');
         if (savedName) {
@@ -595,14 +589,12 @@
         }
     }
 
-    // 更新各欄位與建議 Chips
     function syncWorkerNameFields(name) {
         const checkinInput = document.getElementById('techNameInput');
         const cameraInput = document.getElementById('cameraTechNameInput');
         if (checkinInput) checkinInput.value = name;
         if (cameraInput) cameraInput.value = name;
 
-        // 更新晶片文字與顯示
         const chip1 = document.getElementById('workerSuggestionChip1');
         const chip2 = document.getElementById('workerSuggestionChip2');
         const txt1 = document.getElementById('suggestedWorkerText1');
@@ -616,7 +608,6 @@
         }
     }
 
-    // 更新 `<datalist>` 自動建議清單
     function updateWorkerSuggestions(name) {
         const datalist = document.getElementById('workerSuggestionsList');
         if (!datalist) return;
@@ -629,7 +620,6 @@
         }
     }
 
-    // 載入已儲存資料
     function loadSavedCredentials() {
         const savedName = localStorage.getItem('ael_worker_name');
         if (savedName) {
@@ -639,7 +629,6 @@
         checkPasswordSuggestion();
     }
 
-    // 清除記憶資料
     function resetSavedCredentials() {
         if (confirm('確定要清除已儲存的密碼與技術員姓名嗎？')) {
             localStorage.removeItem('ael_auth_authenticated');
@@ -650,7 +639,6 @@
         }
     }
 
-    // 背景靜態裝置偵測函式
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let deviceType = "Desktop";
@@ -696,7 +684,6 @@
         };
     }
 
-    // 驗證與自動記住密碼
     function verifyPassword() {
         const inputVal = document.getElementById('passwordInput').value;
         const errDiv = document.getElementById('loginError');
@@ -704,7 +691,7 @@
         if (inputVal === APP_PASSWORD) {
             errDiv.style.display = 'none';
             localStorage.setItem('ael_auth_authenticated', 'true');
-            savePassword(inputVal); // 記住密碼
+            savePassword(inputVal);
             autoFillAndGoToCamera();
         } else {
             errDiv.style.display = 'block';
@@ -1035,10 +1022,23 @@
         }
     }
 
+    // UPDATED: Request native camera resolution
     function startCamera() {
         stopCamera();
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => { cameraStream = stream; video.srcObject = stream; video.play(); })
+        const constraints = {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 4096 },
+                height: { ideal: 2160 }
+            }
+        };
+
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(stream => { 
+                cameraStream = stream; 
+                video.srcObject = stream; 
+                video.play(); 
+            })
             .catch(err => alert('無法開啟相機: ' + err.message));
     }
 
@@ -1048,13 +1048,20 @@
         showPage('camera');
     }
 
+    // UPDATED: Draw photo with full camera resolution
     function capturePhoto() {
         if (!cameraStream) { alert('請先開啟鏡頭。'); return; }
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        // Dynamically match canvas size to camera's raw output resolution
+        const nativeWidth = video.videoWidth || 1920;
+        const nativeHeight = video.videoHeight || 1080;
+        
+        canvas.width = nativeWidth;
+        canvas.height = nativeHeight;
+        
+        ctx.drawImage(video, 0, 0, nativeWidth, nativeHeight);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
         tempPhotoArray.push(dataUrl);
         updateCapturedPreview();
     }
@@ -1152,6 +1159,7 @@
         event.target.value = '';
     }
 
+    // --- UPDATED POST FUNCTION WITH WORKER NAME & GPS IN SINGLE JSON PAYLOAD ---
     async function confirmAndUploadPhotos() {
         const techName = document.getElementById('cameraTechNameInput').value.trim() || "未填寫";
         saveWorkerName(techName);
@@ -1174,29 +1182,42 @@
         saveBtn.disabled = true;
         saveBtn.textContent = "⏳ 正在透過 Power Automate 上傳中...";
 
-        const photosToUpload = tempPhotoArray.map((photoBase64, index) => ({
+        // Form photo list with index and base64 strings
+        const photoItems = tempPhotoArray.map((photoBase64, index) => ({
+            photoIndex: index + 1,
+            photoBase64: photoBase64
+        }));
+
+        // Single JSON Payload with Worker Name, GPS, Metadata, and Photo Array
+        const payload = {
             techName: techName,
-            gps: serviceGpsData,
+            gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
             site: site,
             machine: machine,
             machineId: machineId,
             workOrder: workOrder,
             issueType: issueType,
-            photoBase64: photoBase64,
-            photoIndex: index + 1,
             timestamp: timestamp,
-            deviceInfo: deviceInfo
-        }));
+            deviceInfo: deviceInfo,
+            photos: photoItems
+        };
 
         try {
-            for (const photoData of photosToUpload) {
-                await addRecord(STORES.photos, { ...photoData, synced: false });
+            // Save to local IndexedDB backup
+            for (const item of photoItems) {
+                await addRecord(STORES.photos, {
+                    ...payload,
+                    photoBase64: item.photoBase64,
+                    photoIndex: item.photoIndex,
+                    synced: false
+                });
             }
 
+            // HTTP POST payload to Power Automate
             const response = await fetch(POWER_AUTOMATE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ photos: photosToUpload })
+                body: JSON.stringify(payload)
             });
 
             if (response.ok) {
