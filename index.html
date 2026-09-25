@@ -407,7 +407,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -416,7 +416,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機連續拍攝頁面 -->
+    <!-- 相機拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -637,6 +637,7 @@
             localStorage.removeItem('ael_auth_authenticated');
             localStorage.removeItem('ael_saved_password');
             localStorage.removeItem('ael_worker_name');
+            sessionStorage.removeItem('inspectionData');
             alert('已成功清除紀錄！');
             location.reload();
         }
@@ -1082,7 +1083,19 @@
         startCamera();
     }
 
+    function captureInspectionState() {
+        const inspectionData = {
+            site: document.getElementById('siteSelect')?.value || '未填寫',
+            machine: document.getElementById('machineSelect')?.value || '未填寫',
+            machineId: document.getElementById('machineIdSelect')?.value || '未填寫',
+            workOrder: document.getElementById('workOrderInput')?.value || '無工作編號',
+            capturedAt: new Date().toISOString()
+        };
+        sessionStorage.setItem('inspectionData', JSON.stringify(inspectionData));
+    }
+
     function prepareAndShowCamera() {
+        captureInspectionState();
         tempPhotoArray = [];
         updateCapturedPreview();
         showPage('camera');
@@ -1155,12 +1168,20 @@
             ? `${serviceGpsData.latitude.toFixed(4)}, ${serviceGpsData.longitude.toFixed(4)} (±${serviceGpsData.accuracy ? serviceGpsData.accuracy.toFixed(1) + 'm' : '未知'})` 
             : '未取得定位';
 
+        const rawData = sessionStorage.getItem('inspectionData');
+        const inspectionData = rawData ? JSON.parse(rawData) : {
+            site: document.getElementById('siteSelect').value || '未填寫',
+            machine: document.getElementById('machineSelect').value || '未填寫',
+            machineId: document.getElementById('machineIdSelect').value || '未填寫',
+            workOrder: document.getElementById('workOrderInput').value || '未填寫'
+        };
+
         document.getElementById('summaryTechName').textContent = techName;
         document.getElementById('summaryGps').textContent = gpsText;
-        document.getElementById('summarySite').textContent = document.getElementById('siteSelect').value || '未填寫';
-        document.getElementById('summaryMachine').textContent = document.getElementById('machineSelect').value || '未填寫';
-        document.getElementById('summaryReg').textContent = document.getElementById('machineIdSelect').value || '未填寫';
-        document.getElementById('summaryWo').textContent = document.getElementById('workOrderInput').value || '未填寫';
+        document.getElementById('summarySite').textContent = inspectionData.site;
+        document.getElementById('summaryMachine').textContent = inspectionData.machine;
+        document.getElementById('summaryReg').textContent = inspectionData.machineId;
+        document.getElementById('summaryWo').textContent = inspectionData.workOrder;
 
         document.getElementById('issueTypeSelect').value = '沒有問題';
 
@@ -1176,7 +1197,10 @@
         showPage('confirm');
     }
 
-    function uploadPhotos() { document.getElementById('fileInput').click(); }
+    function uploadPhotos() { 
+        captureInspectionState();
+        document.getElementById('fileInput').click(); 
+    }
 
     function handleFileUpload(event) {
         const files = Array.from(event.target.files);
@@ -1201,10 +1225,14 @@
         const techName = document.getElementById('cameraTechNameInput').value.trim() || "未填寫";
         saveWorkerName(techName);
 
-        const site = document.getElementById('siteSelect').value;
-        const machine = document.getElementById('machineSelect').value;
-        const machineId = document.getElementById('machineIdSelect').value;
-        const workOrder = document.getElementById('workOrderInput').value || "無工作編號";
+        const rawData = sessionStorage.getItem('inspectionData');
+        const formData = rawData ? JSON.parse(rawData) : {
+            site: document.getElementById('siteSelect').value || "未填寫",
+            machine: document.getElementById('machineSelect').value || "未填寫",
+            machineId: document.getElementById('machineIdSelect').value || "未填寫",
+            workOrder: document.getElementById('workOrderInput').value || "無工作編號"
+        };
+
         const issueType = document.getElementById('issueTypeSelect').value;
         const timestamp = new Date().toISOString();
         const deviceInfo = getDeviceInfo();
@@ -1227,10 +1255,10 @@
         const payload = {
             techName: techName,
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
-            site: site,
-            machine: machine,
-            machineId: machineId,
-            workOrder: workOrder,
+            site: formData.site,
+            machine: formData.machine,
+            machineId: formData.machineId,
+            workOrder: formData.workOrder,
             issueType: issueType,
             timestamp: timestamp,
             deviceInfo: deviceInfo,
@@ -1260,6 +1288,7 @@
                     p.synced = true;
                     await updateRecord(STORES.photos, p);
                 }
+                sessionStorage.removeItem('inspectionData');
                 alert("🎉 上載成功！資料與照片已成功傳送至 Power Automate 處理。");
             } else {
                 alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})，照片已先儲存至本地備份。`);
