@@ -482,7 +482,7 @@
                 <span class="required">*</span>
             </div>
             <div class="sub-text">請選擇最主要的故障；如設備正常，請選「沒有問題」</div>
-            <select id="issueTypeSelect" class="input">
+            <select id="issueTypeSelect" class="input" onchange="toggleOtherIssueInput()">
                 <option value="沒有問題" selected>沒有問題</option>
                 <option value="水泵故障不運作">水泵故障不運作</option>
                 <option value="無供水">無供水</option>
@@ -506,6 +506,16 @@
                 <option value="水浸">水浸</option>
                 <option value="其他">其他</option>
             </select>
+
+            <!-- 選取「其他」時顯示的詳細文字輸入框 -->
+            <div id="otherIssueContainer" style="display:none; margin-top: -4px; margin-bottom: 10px;">
+                <div class="label-container">
+                    <span class="num-badge">✍️</span>
+                    <span class="field-label">請說明其他故障詳情</span>
+                    <span class="required">*</span>
+                </div>
+                <input type="text" id="otherIssueInput" class="input" placeholder="請在此輸入故障描述...">
+            </div>
 
             <div class="label-container" style="margin-top:14px;">
                 <span class="num-badge">📸</span>
@@ -549,6 +559,20 @@
     let photoFacingMode = "environment";
     let standaloneGpsData = null;
     let serviceGpsData = null;
+
+    function toggleOtherIssueInput() {
+        const select = document.getElementById('issueTypeSelect');
+        const container = document.getElementById('otherIssueContainer');
+        const input = document.getElementById('otherIssueInput');
+        
+        if (select.value === '其他') {
+            container.style.display = 'block';
+            input.focus();
+        } else {
+            container.style.display = 'none';
+            input.value = '';
+        }
+    }
 
     function savePassword(pwd) {
         if (pwd) {
@@ -1183,6 +1207,7 @@
         document.getElementById('summaryWo').textContent = inspectionData.workOrder;
 
         document.getElementById('issueTypeSelect').value = '沒有問題';
+        toggleOtherIssueInput();
 
         document.getElementById('confirmCount').textContent = tempPhotoArray.length;
         const grid = document.getElementById('confirmPreviewGrid');
@@ -1232,7 +1257,17 @@
             workOrder: document.getElementById('workOrderInput').value || "無工作編號"
         };
 
-        const issueType = document.getElementById('issueTypeSelect').value;
+        let issueType = document.getElementById('issueTypeSelect').value;
+        if (issueType === '其他') {
+            const otherDetail = document.getElementById('otherIssueInput').value.trim();
+            if (!otherDetail) {
+                alert('請填寫其他故障詳細說明！');
+                document.getElementById('otherIssueInput').focus();
+                return;
+            }
+            issueType = `其他: ${otherDetail}`;
+        }
+
         const timestamp = new Date().toISOString();
         const deviceInfo = getDeviceInfo();
 
