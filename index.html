@@ -46,7 +46,6 @@
             color: #0f172a;
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: 10px;
         }
 
@@ -127,26 +126,6 @@
             border-color: #475569;
             background: #ffffff;
             box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
-        }
-
-        /* 鎖定唯讀模式樣式 */
-        .input.readonly-locked {
-            background-color: #cbd5e1 !important;
-            color: #334155 !important;
-            border-color: #94a3b8 !important;
-            cursor: not-allowed !important;
-            font-weight: 600;
-        }
-
-        .lock-badge {
-            background-color: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 600;
-            display: none;
         }
 
         .btn { 
@@ -388,24 +367,20 @@
         </div>
 
         <div class="card">
-            <h3>
-                <span>巡檢項目資料</span>
-                <span id="qrLockBadge" class="lock-badge">🔒 已由 QR/連結鎖定</span>
-                <button id="unlockInspectionBtn" class="btn secondary" style="display:none; width:auto; padding:4px 8px; font-size:11px;" onclick="unlockInspectionFields()">🔓 解鎖編輯</button>
-            </h3>
+            <h3>巡檢項目資料</h3>
 
             <div class="label-container">
                 <span class="num-badge">1</span>
                 <span class="field-label">場地名稱</span>
             </div>
-            <input type="text" id="siteSelect" class="input inspection-field" list="siteList" placeholder="請選擇或打字搜尋場地">
+            <input type="text" id="siteSelect" class="input" list="siteList" placeholder="請選擇或打字搜尋場地">
             <datalist id="siteList"></datalist>
 
             <div class="label-container">
                 <span class="num-badge">2</span>
                 <span class="field-label">設備名稱</span>
             </div>
-            <input type="text" id="machineSelect" class="input inspection-field" list="machineList" placeholder="請選擇或打字搜尋設備">
+            <input type="text" id="machineSelect" class="input" list="machineList" placeholder="請選擇或打字搜尋設備">
             <datalist id="machineList"></datalist>
 
             <div class="label-container">
@@ -413,14 +388,14 @@
                 <span class="field-label">機器編號</span>
                 <span class="required">*</span>
             </div>
-            <input type="text" id="machineIdSelect" class="input inspection-field" list="machineIdList" placeholder="請選擇或打字搜尋機器編號">
+            <input type="text" id="machineIdSelect" class="input" list="machineIdList" placeholder="請選擇或打字搜尋機器編號">
             <datalist id="machineIdList"></datalist>
 
             <div class="label-container">
                 <span class="num-badge">4</span>
                 <span class="field-label">工作編號</span>
             </div>
-            <input type="text" id="workOrderInput" class="input inspection-field" placeholder="例如：WO-2026-001">
+            <input type="text" id="workOrderInput" class="input" placeholder="例如：WO-2026-001">
             <div class="sub-text">工作編號可由 QR Code 掃描、連結帶入或手動輸入。</div>
         </div>
 
@@ -432,7 +407,7 @@
             </div>
 
             <div class="grid2" style="margin-top:10px;">
-                <button class="btn success" onclick="prepareAndShowCamera()">📷 連續拍攝照片</button>
+                <button class="btn success" onclick="prepareAndShowCamera()">📷 拍攝照片</button>
                 <button class="btn secondary" onclick="uploadPhotos()">📤 選擇檔案上傳</button>
                 <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileUpload(event)">
             </div>
@@ -441,7 +416,7 @@
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
     </div>
 
-    <!-- 相機連續拍攝頁面 -->
+    <!-- 相機拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
             <h3>📷 拍攝相片與技術員簽到</h3>
@@ -483,9 +458,8 @@
             <div id="capturedPreviewGrid" class="photo-grid"></div>
         </div>
 
-        <div class="grid2">
+        <div>
             <button class="btn primary" onclick="goToConfirmPage()">✅ 完成並確認</button>
-            <button class="btn danger" onclick="showPage('service')">取消返回</button>
         </div>
     </div>
 
@@ -575,35 +549,6 @@
     let photoFacingMode = "environment";
     let standaloneGpsData = null;
     let serviceGpsData = null;
-
-    // --- 鎖定／解鎖 巡檢項目資料 邏輯 ---
-    function lockInspectionFields() {
-        const fields = document.querySelectorAll('.inspection-field');
-        fields.forEach(el => {
-            el.readOnly = true;
-            el.classList.add('readonly-locked');
-            // 如果輸入框連接 datalist，暫時把 list 移除以阻擋選單彈出
-            if (el.hasAttribute('list')) {
-                el.setAttribute('data-saved-list', el.getAttribute('list'));
-                el.removeAttribute('list');
-            }
-        });
-        document.getElementById('qrLockBadge').style.display = 'inline-block';
-        document.getElementById('unlockInspectionBtn').style.display = 'inline-block';
-    }
-
-    function unlockInspectionFields() {
-        const fields = document.querySelectorAll('.inspection-field');
-        fields.forEach(el => {
-            el.readOnly = false;
-            el.classList.remove('readonly-locked');
-            if (el.hasAttribute('data-saved-list')) {
-                el.setAttribute('list', el.getAttribute('data-saved-list'));
-            }
-        });
-        document.getElementById('qrLockBadge').style.display = 'none';
-        document.getElementById('unlockInspectionBtn').style.display = 'none';
-    }
 
     function savePassword(pwd) {
         if (pwd) {
@@ -991,7 +936,7 @@
     function populateSelect(inputId, items) {
         const input = document.getElementById(inputId);
         if (!input) return;
-        const listId = input.getAttribute('list') || input.getAttribute('data-saved-list');
+        const listId = input.getAttribute('list');
         const datalist = document.getElementById(listId);
         
         if (!datalist) return;
@@ -1070,7 +1015,6 @@
                 if (machineId) setSelectValue('machineIdSelect', machineId);
                 if (workOrder) document.getElementById('workOrderInput').value = workOrder;
 
-                lockInspectionFields();
                 return;
             }
 
@@ -1081,8 +1025,6 @@
             if (data.machineId) setSelectValue('machineIdSelect', data.machineId);
             if (data.workOrder) document.getElementById('workOrderInput').value = data.workOrder;
 
-            lockInspectionFields();
-
         } catch (e) {
             const delimiter = decodedText.includes('|') ? '|' : (decodedText.includes(',') ? ',' : '\n');
             const parts = decodedText.split(delimiter).map(p => p.trim());
@@ -1091,8 +1033,6 @@
             if (parts.length >= 2 && parts[1]) setSelectValue('machineSelect', parts[1]);
             if (parts.length >= 3 && parts[2]) setSelectValue('machineIdSelect', parts[2]);
             if (parts.length >= 4 && parts[3]) document.getElementById('workOrderInput').value = parts[3];
-
-            lockInspectionFields();
         }
     }
 
@@ -1374,8 +1314,7 @@
         const machineId = urlParams.get('machineId');
         const workOrder = urlParams.get('workOrder');
 
-        const hasInspectionParams = site || machine || machineId || workOrder;
-        const hasEmbedParams = techName || hasInspectionParams;
+        const hasEmbedParams = techName || site || machine || machineId || workOrder;
 
         if (hasEmbedParams) {
             if (techName) {
@@ -1385,10 +1324,6 @@
             if (machine) setSelectValue('machineSelect', machine);
             if (machineId) setSelectValue('machineIdSelect', machineId);
             if (workOrder) document.getElementById('workOrderInput').value = workOrder;
-
-            if (hasInspectionParams) {
-                lockInspectionFields();
-            }
 
             prepareAndShowCamera();
         } else {
