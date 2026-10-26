@@ -548,7 +548,7 @@
     const DB_VERSION = 5;
     const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos', checkIns: 'checkIns' };
 
-    const DEFAULT_SITES = ["上水救護站", "AIA TOWER"];
+    const DEFAULT_SITES = ["上水救護站", "AIA TOWER", "九龍塘消防局", "黃大仙警署"];
     const DEFAULT_MACHINES = ["傳統水泵", "加壓水泵", "潛水式水泵"];
     const DEFAULT_MACHINE_IDS = ["WP30848", "10337628-01", "SHK-WP30999"];
 
@@ -1300,6 +1300,7 @@
         };
 
         try {
+            // First store to local IndexedDB backup regardless
             for (const item of photoItems) {
                 await addRecord(STORES.photos, {
                     ...payload,
@@ -1324,16 +1325,19 @@
                 }
                 sessionStorage.removeItem('inspectionData');
                 alert("🎉 上載成功！資料與照片已成功傳送至 Power Automate 處理。");
+                
+                tempPhotoArray = [];
+                document.getElementById('workOrderInput').value = '';
+                showPage('service');
             } else {
-                alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})，照片已先儲存至本地備份。`);
+                // FAILURE: Pop up message and STAY on the confirmation page
+                alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})。\n照片與資料已儲存至本地備份，您可以前往「雲端同步中心」重新同步。`);
+                // Note: We do NOT clear tempPhotoArray, do NOT navigate away, and do NOT remove sessionStorage so user stays on confirm page.
             }
 
-            tempPhotoArray = [];
-            document.getElementById('workOrderInput').value = '';
-            showPage('service');
-
         } catch (err) {
-            alert("⚠️ 網路傳輸異常，照片已先儲存至本地備份：" + err.message);
+            // NETWORK ERROR / CATCH: Pop up message and STAY on the confirmation page
+            alert("⚠️ 網路傳輸異常：" + err.message + "\n照片與資料已儲存至本地備份，您可以隨時重試。");
         } finally {
             saveBtn.disabled = false;
             saveBtn.textContent = originalText;
