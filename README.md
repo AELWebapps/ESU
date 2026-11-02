@@ -1,4 +1,4 @@
-<img width="365" height="2268" alt="image" src="https://github.com/user-attachments/assets/f52fc725-d88d-4551-b596-150b88260eb2" />I don't really know, man... what can I say?
+I don't really know, man... what can I say?
 6️⃣7️⃣6️⃣7️⃣6️⃣7️⃣6️⃣7️⃣😫😫
 
 # 🔧📱 AEL Field Maintenance System
