@@ -1,126 +1,222 @@
-I don't really know, man... what can I say?
+<img width="365" height="2268" alt="image" src="https://github.com/user-attachments/assets/f52fc725-d88d-4551-b596-150b88260eb2" />I don't really know, man... what can I say?
 6️⃣7️⃣6️⃣7️⃣6️⃣7️⃣6️⃣7️⃣😫😫
 
-🔧📱 AEL Field Maintenance System
-🏗️ Mobile Field Inspection • 📷 Photo Capture • 📍 GPS • 🔳 QR Code • ☁️ Power Automate • 💾 Offline Backup
+# 🔧📱 AEL Field Maintenance System
 
-A mobile-first field maintenance and equipment inspection web application designed for technicians working on site.
+> 🏗️ Field Inspection • 📷 Photos • 📍 GPS • 🔳 QR Code • 💾 Offline Storage • ☁️ Power Automate
 
-The system combines equipment identification, QR scanning, GPS positioning, camera/photo capture, fault reporting, technician check-in and cloud synchronization into one simple browser-based workflow.
+A mobile-first web app for field maintenance and equipment inspection.
 
-✨🚀 Key Features
-🔐 System Login
-Secure entry screen before accessing the maintenance interface.
+Technicians can scan equipment, capture photos, record GPS locations, report faults, and upload inspection records to Microsoft Power Automate.
 
-🏗️ Site & Equipment Selection
-Record the site, equipment type, machine ID and work order.
+---
 
-🔳 QR Code Scanning
-Scan equipment QR codes to automatically populate inspection information.
+## ✨ Features
 
-📍 GPS Positioning
-Capture latitude, longitude and GPS accuracy during field operations.
+- 🔳 **QR Code Scanning** – Identify equipment quickly
+- 📷 **Camera Capture** – Take inspection photos
+- 🖼️ **Photo Upload** – Upload existing images
+- 📍 **GPS Location** – Record inspection location
+- 👷 **Technician Check-In** – Record technician and location
+- 🏗️ **Equipment Inspection** – Record equipment details
+- 📋 **Work Orders** – Link inspections to work orders
+- ⚠️ **Fault Reporting** – Record equipment problems
+- 💾 **Offline Storage** – Save records locally
+- ☁️ **Power Automate** – Upload inspection data
+- 🔄 **Cloud Sync** – Retry unsynchronized records
+- 📱 **Mobile-Friendly UI** – Designed for field use
 
-📷 Camera & Photo Upload
-Take inspection photos directly from the device camera or select existing images.
+---
 
-🔄 Front / Rear Camera Switching
-Switch between device cameras directly inside the application.
+## 🧭 Workflow
 
-👷 Technician Check-In
-Record technician name, GPS position, timestamp and device information.
+```text
+🔐 Login
+   │
+   ▼
+🏠 Home
+   │
+   ├── 👷 Technician Check-In
+   │
+   ├── 🔳 QR Scan
+   │       │
+   │       ▼
+   │   🏗️ Equipment
+   │       │
+   │       ▼
+   │   📍 GPS
+   │       │
+   │       ▼
+   │   📷 Photos
+   │       │
+   │       ▼
+   │   ⚠️ Fault Report
+   │       │
+   │       ▼
+   │   ✅ Confirmation
+   │
+   └── ☁️ Cloud Sync
+```
 
-⚠️ Fault Reporting
-Select common equipment problems or enter a custom fault description.
+---
 
-💾 Offline Local Backup
-Store inspection records locally using IndexedDB when cloud upload is unavailable.
+## 🔳 QR Code
 
-☁️ Power Automate Integration
-Send inspection records, photos and field information to Microsoft Power Automate.
+QR codes can provide:
 
-🔁 Manual Re-Synchronization
-Retry locally stored records through the Cloud Sync Center.
+- 🏢 Site
+- 🔧 Equipment
+- 🆔 Machine ID
+- 📋 Work Order
+- 👷 Technician
 
-📱 Mobile-First Interface
-Designed for technicians using phones and tablets during site work.
+---
 
-🔳 QR Code Support
+## 📷 Inspection Photos
 
-QR codes can automatically populate inspection information.
+Technicians can:
 
-📦 Supported information
-👷 Technician
-🏢 Site
-🔧 Equipment
-🆔 Machine ID
-📋 Work Order
+- 📸 Take photos
+- 🖼️ Upload photos
+- 🔄 Switch cameras
+- 👀 Preview photos
+- ❌ Delete unwanted photos
+- ☁️ Upload photos with inspection records
 
-📷 Photo Inspection
+---
 
-Technicians can document equipment conditions directly from their device.
+## 📍 GPS
 
-📸 Available functions
-📷 Take photo
-🖼️ Upload existing image
-📚 Capture multiple photos
-👀 Preview photos before submission
-❌ Remove unwanted photos
-🔄 Switch front/rear camera
-📍 Associate GPS information
-☁️ Upload photos through Power Automate
-📍 GPS Location
+The system can record:
 
-The application uses the browser's Geolocation API.
+- 🌐 Latitude
+- 🌐 Longitude
+- 🎯 GPS accuracy
 
-Location information can include:
+---
 
-📍 Latitude
- 📍 Longitude
- 🎯 GPS Accuracy
+## ⚠️ Fault Reporting
 
-This information can be associated with technician check-ins and maintenance inspection records.
+Record common issues such as:
 
-⚠️ Equipment Fault Reporting
+- ✅ No Issue
+- 💧 No Water
+- 📉 Low Pressure
+- 🚰 Leakage
+- 💥 Burst Pipe
+- 🔊 Abnormal Noise
+- 🚨 Alarm
+- ⚡ Power Failure
+- 📡 Sensor Fault
+- 🌊 Flooding
+- ✍️ Other
 
-Technicians can record the primary problem found during inspection.
+---
 
-Examples include:
+## 💾 Offline Storage
 
-✅ No problem
-💧 No water supply
-📉 Low water pressure
-🚰 Water leakage
-💥 Burst pipe
-🔊 Abnormal noise
-🚨 Alarm
-⚡ Electrical trip / no power
-🎛️ Panel fault
-📡 Sensor fault
-🌊 Flooding
-✍️ Other / custom description
-👷📍 Technician Check-In
+Inspection data can be stored locally using:
 
-The standalone check-in function records field attendance information.
+- 🗃️ **IndexedDB**
+- 💾 **LocalStorage**
+- ⏱️ **SessionStorage**
 
-📝 Information recorded
+This allows unsynchronized records to remain available for later upload.
 
-👤 Technician name
- 📍 GPS position
- 🕐 Timestamp
- 📱 Device information
- ☁️ Synchronization status
+---
 
- 🛠️💻 Technology Stack
-🔧 Technology	🎯 Purpose🌐 HTML5	Application structure
-🎨 CSS3	Mobile interface
-⚙️ JavaScript	Application logic
-🗃️ IndexedDB	Offline/local records
-💾 LocalStorage	Saved browser information
-⏱️ SessionStorage	Temporary inspection state
-📷 MediaDevices API	Camera access
-📍 Geolocation API	GPS positioning
-🖼️ FileReader API	Image upload
-🎨 Canvas API	Camera image capture
-🔳 html5-qrcode	QR code scanning
-☁️ Microsoft Power Automate	Cloud workflow integration
+## ☁️ Power Automate
+
+```text
+📱 Field App
+     │
+     ▼
+📦 JSON Data
+     │
+     ▼
+☁️ Power Automate
+     │
+     ├── 👷 Technician
+     ├── 📍 GPS
+     ├── 🏢 Site
+     ├── 🔧 Equipment
+     ├── 🆔 Machine ID
+     ├── 📋 Work Order
+     ├── ⚠️ Fault
+     ├── 📷 Photos
+     └── 🕐 Timestamp
+```
+
+### 🔄 Offline Upload
+
+```text
+❌ Upload Failed
+      ↓
+💾 Local Backup
+      ↓
+☁️ Cloud Sync
+      ↓
+🔄 Retry Upload
+```
+
+---
+
+## 🛠️ Technologies
+
+- 🌐 HTML5
+- 🎨 CSS3
+- ⚙️ JavaScript
+- 🗃️ IndexedDB
+- 📷 MediaDevices API
+- 📍 Geolocation API
+- 🔳 html5-qrcode
+- ☁️ Microsoft Power Automate
+
+---
+
+## 📂 Files
+
+```text
+📦 AEL-Field-Maintenance
+│
+├── 🌐 index.html
+├── ⚙️ sw.js
+└── 📖 README.md
+```
+
+---
+
+## 🚀 Run
+
+Start a local server:
+
+```bash
+python -m http.server 8000
+```
+
+Then open the app in your browser.
+
+> 📷 Camera and 📍 location permissions may be required.
+
+---
+
+## 🚀 Future Improvements
+
+- 🔐 Microsoft Entra ID Login
+- 📴 Better Offline Mode
+- 🔄 Automatic Sync
+- 📊 Maintenance Dashboard
+- 📜 Inspection History
+- 👥 Role-Based Access
+- 🔔 Notifications
+- 🗺️ Site Mapping
+
+---
+
+## 📄 Status
+
+🚧 **Under Development**
+
+Built for easier field inspection and maintenance.
+
+**📱 Capture • 📍 Locate • 🔳 Identify • 💾 Store • ☁️ Sync**
