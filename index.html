@@ -439,6 +439,11 @@
             <div id="cameraGpsStatus" class="gps-box">正在獲取 GPS 定位資訊...</div>
             <button class="btn secondary" style="padding:6px; font-size:11px; margin-bottom:12px;" onclick="getGpsLocation('cameraGpsStatus', 'service')">🔄 重新整理 GPS 定位</button>
 
+            <!-- 畫質／解鎖切換按鈕 -->
+            <button id="resolutionToggleBtn" class="btn warning" style="margin-bottom: 10px; font-size: 13px;" onclick="toggleResolutionMode()">
+                🖼️ 解析度模式: <span>精簡省流 (1280x720)</span>
+            </button>
+
             <video id="cameraFeed" autoplay playsinline style="width:100%; height:200px; background:#0f172a; border-radius:10px; margin-top:6px;"></video>
             <canvas id="cameraCanvas" hidden></canvas>
             
@@ -560,12 +565,36 @@
     let standaloneGpsData = null;
     let serviceGpsData = null;
 
-    // --- 圖片壓縮/縮放 Helper ---
-    function resizeImage(base64Str, maxWidth = 1920, maxHeight = 1080, quality = 0.8) {
+    // 預設解析度模式：'reduced' (預設 1280x720) 或 'full' (原生最高畫質)
+    let currentResolutionMode = 'reduced';
+
+    function toggleResolutionMode() {
+        const btnSpan = document.querySelector('#resolutionToggleBtn span');
+        if (currentResolutionMode === 'reduced') {
+            currentResolutionMode = 'full';
+            btnSpan.textContent = '原生最高畫質 (Full HD+)';
+        } else {
+            currentResolutionMode = 'reduced';
+            btnSpan.textContent = '精簡省流 (1280x720)';
+        }
+    }
+
+    // 圖片壓縮與動態解析度控制
+    function resizeImage(base64Str) {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = base64Str;
             img.onload = () => {
+                let maxWidth = 1600;
+                let maxHeight = 800;
+                let quality = 0.8;
+
+                if (currentResolutionMode === 'full') {
+                    maxWidth = 4096;
+                    maxHeight = 2160;
+                    quality = 0.95;
+                }
+
                 let width = img.width;
                 let height = img.height;
 
@@ -585,7 +614,7 @@
                 const resizedBase64 = canvas.toDataURL('image/jpeg', quality);
                 resolve(resizedBase64);
             };
-            img.onerror = () => resolve(base64Str); // Fallback to raw if load fails
+            img.onerror = () => resolve(base64Str);
         });
     }
 
@@ -1165,7 +1194,7 @@
         ctx.drawImage(video, 0, 0, nativeWidth, nativeHeight);
         
         const rawDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        const optimizedDataUrl = await resizeImage(rawDataUrl, 1920, 1080, 0.85);
+        const optimizedDataUrl = await resizeImage(rawDataUrl);
 
         tempPhotoArray.push(optimizedDataUrl);
         updateCapturedPreview();
@@ -1184,7 +1213,7 @@
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = async function(e) {
-                const optimizedDataUrl = await resizeImage(e.target.result, 1920, 1080, 0.85);
+                const optimizedDataUrl = await resizeImage(e.target.result);
                 tempPhotoArray.push(optimizedDataUrl);
                 loadedCount++;
                 if (loadedCount === files.length) {
@@ -1268,7 +1297,7 @@
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = async function(e) {
-                const optimizedDataUrl = await resizeImage(e.target.result, 1920, 1080, 0.85);
+                const optimizedDataUrl = await resizeImage(e.target.result);
                 tempPhotoArray.push(optimizedDataUrl);
                 loadedCount++;
                 if (loadedCount === files.length) goToConfirmPage();
