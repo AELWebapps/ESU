@@ -89,25 +89,6 @@
             margin-bottom: 12px;
         }
 
-        .suggestion-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #e2e8f0;
-            border: 1px solid #94a3b8;
-            border-radius: 16px;
-            padding: 4px 10px;
-            font-size: 12px;
-            color: #0f172a;
-            cursor: pointer;
-            margin-bottom: 8px;
-            transition: background 0.2s;
-        }
-
-        .suggestion-chip:hover {
-            background: #cbd5e1;
-        }
-
         .input { 
             width: 100%; 
             padding: 12px; 
@@ -242,51 +223,13 @@
         }
 
         .sync-badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; background: #ef4444; color: #fff; display: inline-block; margin-left: 6px; }
-        
-        .error-message {
-            color: #dc2626;
-            font-size: 13px;
-            margin-top: 6px;
-            display: none;
-        }
     </style>
 </head>
 <body>
 <div class="phone">
 
-    <!-- 密碼驗證頁面 -->
-    <div id="login" class="screen active">
-        <div class="header-card">
-            <div class="header-icon">🔒</div>
-            <div>
-                <div class="header-title">AEL MAINTENANCE SYSTEM</div>
-                <div class="header-subtitle">系統存取驗證</div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>請輸入登入密碼</h3>
-            <div class="sub-text">存取此維護系統需要授權密碼</div>
-            
-            <div class="label-container" style="margin-top: 10px;">
-                <span class="num-badge">🔑</span>
-                <span class="field-label">密碼</span>
-            </div>
-
-            <div id="pwdSuggestionChip" class="suggestion-chip" style="display:none;" onclick="useSavedPassword()">
-                💡 建議使用已儲存的密碼: <strong id="suggestedPwdText">••••••••</strong> (點擊填入)
-            </div>
-
-            <input type="password" id="passwordInput" class="input" placeholder="請輸入 8 位數密碼" autocomplete="current-password" onkeyup="checkEnterKey(event)">
-            <div id="loginError" class="error-message">❌ 密碼錯誤，請重新輸入。</div>
-            
-            <br>
-            <button class="btn primary" onclick="verifyPassword()">解鎖登入</button>
-        </div>
-    </div>
-
     <!-- 主頁 -->
-    <div id="home" class="screen">
+    <div id="home" class="screen active">
         <div class="header-card">
             <div class="header-icon">🔧</div>
             <div>
@@ -297,12 +240,10 @@
 
         <div style="display:flex; flex-direction:column; gap:12px;">
             <button class="btn success" onclick="showPage('service')">🛠️ 工程服務 (Site)</button>
-            <button class="btn info" onclick="showPage('checkin')">📍 技術員獨立簽到 (Check-in)</button>
             <button class="btn secondary" onclick="showPage('syncSettings')">
                 ☁️ 雲端同步中心 
                 <span id="unsyncedBadge" class="sync-badge" style="display:none;">0 待同步</span>
             </button>
-            <button class="btn danger" style="padding: 8px; font-size: 12px; margin-top: 8px;" onclick="resetSavedCredentials()">⚙️ 清除已儲存的密碼／技術員紀錄</button>
         </div>
     </div>
 
@@ -313,7 +254,6 @@
             <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至 Power Automate。</div>
             
             <div style="font-size:14px; line-height:1.8; color:#334151; background:#e2e8f0; padding:14px; border-radius:10px; border:1px solid #cbd5e1;">
-                • 待同步簽到紀錄：<strong id="pendingCheckinsCount">0</strong> 筆<br>
                 • 待同步工程照片/資料：<strong id="pendingPhotosCount">0</strong> 筆
             </div>
             <br>
@@ -321,38 +261,6 @@
         </div>
 
         <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
-    </div>
-
-    <!-- 技術員獨立簽到頁面 -->
-    <div id="checkin" class="screen">
-        <div class="card">
-            <h3>📍 技術員獨立簽到</h3>
-
-            <div class="label-container">
-                <span class="num-badge">1</span>
-                <span class="field-label">技術員姓名</span>
-            </div>
-
-            <div id="workerSuggestionChip1" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('techNameInput')">
-                💡 建議使用已儲存姓名: <strong id="suggestedWorkerText1"></strong> (點擊填入)
-            </div>
-
-            <input type="text" id="techNameInput" class="input" list="workerSuggestionsList" placeholder="請輸入姓名 (例如：張大明)" onchange="saveWorkerName(this.value)">
-            <datalist id="workerSuggestionsList"></datalist>
-
-            <div class="label-container">
-                <span class="num-badge">2</span>
-                <span class="field-label">衛星定位</span>
-                <span class="required">*</span>
-            </div>
-            <div id="gpsStatus" class="gps-box">正在獲取 GPS 定位資訊...</div>
-            <button class="btn secondary" style="padding:8px; font-size:12px;" onclick="getGpsLocation('gpsStatus', 'standalone')">🔄 重新整理 GPS 定位</button>
-        </div>
-
-        <div class="grid2">
-            <button class="btn success" onclick="submitCheckIn()">✅ 確認簽到</button>
-            <button class="btn secondary" onclick="showPage('home')">返回主頁</button>
-        </div>
     </div>
 
     <!-- 工程服務頁面 -->
@@ -419,29 +327,18 @@
     <!-- 相機拍攝頁面 -->
     <div id="camera" class="screen">
         <div class="card">
-            <h3>📷 拍攝相片與技術員簽到</h3>
-            
-            <div class="label-container" style="margin-top: 0;">
-                <span class="num-badge">👤</span>
-                <span class="field-label">技術員姓名</span>
-            </div>
-
-            <div id="workerSuggestionChip2" class="suggestion-chip" style="display:none;" onclick="useSavedWorkerName('cameraTechNameInput')">
-                💡 建議使用已儲存姓名: <strong id="suggestedWorkerText2"></strong> (點擊填入)
-            </div>
-
-            <input type="text" id="cameraTechNameInput" class="input" list="workerSuggestionsList" placeholder="請輸入技術員姓名" onchange="saveWorkerName(this.value)">
+            <h3>📷 拍攝相片</h3>
 
             <div class="label-container">
                 <span class="num-badge">📍</span>
                 <span class="field-label">拍攝 GPS 定位</span>
             </div>
             <div id="cameraGpsStatus" class="gps-box">正在獲取 GPS 定位資訊...</div>
-            <button class="btn secondary" style="padding:6px; font-size:11px; margin-bottom:12px;" onclick="getGpsLocation('cameraGpsStatus', 'service')">🔄 重新整理 GPS 定位</button>
+            <button class="btn secondary" style="padding:6px; font-size:11px; margin-bottom:12px;" onclick="getGpsLocation('cameraGpsStatus')">🔄 重新整理 GPS 定位</button>
 
             <!-- 畫質／解鎖切換按鈕 -->
             <button id="resolutionToggleBtn" class="btn warning" style="margin-bottom: 10px; font-size: 13px;" onclick="toggleResolutionMode()">
-                🖼️ 解析度模式: <span>精簡省流 (1600x800p)</span>
+                🖼️ 解析度模式: <span>精簡省流 (1280x720)</span>
             </button>
 
             <video id="cameraFeed" autoplay playsinline style="width:100%; height:200px; background:#0f172a; border-radius:10px; margin-top:6px;"></video>
@@ -473,7 +370,6 @@
         <div class="card">
             <h3>確認上載內容</h3>
             <div style="font-size:13px; color:#334151; margin-bottom:10px; background:#e2e8f0; padding:12px; border-radius:10px; border:1px solid #cbd5e1;">
-                <p style="margin:2px 0;"><strong>技術員:</strong> <span id="summaryTechName">--</span></p>
                 <p style="margin:2px 0;"><strong>GPS 定位:</strong> <span id="summaryGps">--</span></p>
                 <p style="margin:2px 0;"><strong>場地名稱:</strong> <span id="summarySite">--</span></p>
                 <p style="margin:2px 0;"><strong>設備名稱:</strong> <span id="summaryMachine">--</span></p>
@@ -546,26 +442,23 @@
         });
     }
 
-    const APP_PASSWORD = "27671000";
     const POWER_AUTOMATE_URL = "https://3685358de1b2e6f89344b173ee068c.8f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/1ca055e3b77f4a08bb3f70f9f34e0aef/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=7yKFsQX_D6yiPiPIDGWCwvUCeIQL1dEVWAgf0wFf-Oc";
 
     const DB_NAME = 'AEL_MaintenanceDB';
-    const DB_VERSION = 5;
-    const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos', checkIns: 'checkIns' };
+    const DB_VERSION = 6;
+    const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos' };
 
-    const DEFAULT_SITES = ["上水救護站", "AIA TOWER", "九龍塘消防局", "黃大仙警署"];
-    const DEFAULT_MACHINES = ["傳統水泵", "加壓水泵", "潛水式水泵"];
-    const DEFAULT_MACHINE_IDS = ["WP30848", "10337628-01", "SHK-WP30999"];
+    const DEFAULT_SITES = ["TEST"];
+    const DEFAULT_MACHINES = ["TEST"];
+    const DEFAULT_MACHINE_IDS = ["TEST"];
 
     let db = null;
     let tempPhotoArray = [];
     let html5QrcodeScanner = null;
     let qrFacingMode = "environment";
     let photoFacingMode = "environment";
-    let standaloneGpsData = null;
     let serviceGpsData = null;
 
-    // 預設解析度模式：'reduced' (預設 1280x720) 或 'full' (原生最高畫質)
     let currentResolutionMode = 'reduced';
 
     function toggleResolutionMode() {
@@ -579,14 +472,13 @@
         }
     }
 
-    // 圖片壓縮與動態解析度控制
     function resizeImage(base64Str) {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = base64Str;
             img.onload = () => {
-                let maxWidth = 1600;
-                let maxHeight = 800;
+                let maxWidth = 1280;
+                let maxHeight = 720;
                 let quality = 0.8;
 
                 if (currentResolutionMode === 'full') {
@@ -632,165 +524,6 @@
         }
     }
 
-    function savePassword(pwd) {
-        if (pwd) {
-            localStorage.setItem('ael_saved_password', pwd);
-        }
-    }
-
-    function useSavedPassword() {
-        const savedPwd = localStorage.getItem('ael_saved_password');
-        if (savedPwd) {
-            document.getElementById('passwordInput').value = savedPwd;
-        }
-    }
-
-    function checkPasswordSuggestion() {
-        const savedPwd = localStorage.getItem('ael_saved_password');
-        const chip = document.getElementById('pwdSuggestionChip');
-        if (savedPwd) {
-            chip.style.display = 'inline-flex';
-            document.getElementById('passwordInput').value = savedPwd;
-        } else {
-            chip.style.display = 'none';
-        }
-    }
-
-    function saveWorkerName(name) {
-        if (name && name.trim()) {
-            const cleanName = name.trim();
-            localStorage.setItem('ael_worker_name', cleanName);
-            syncWorkerNameFields(cleanName);
-            updateWorkerSuggestions(cleanName);
-        }
-    }
-
-    function useSavedWorkerName(inputId) {
-        const savedName = localStorage.getItem('ael_worker_name');
-        if (savedName) {
-            const el = document.getElementById(inputId);
-            if (el) el.value = savedName;
-        }
-    }
-
-    function syncWorkerNameFields(name) {
-        const checkinInput = document.getElementById('techNameInput');
-        const cameraInput = document.getElementById('cameraTechNameInput');
-        if (checkinInput) checkinInput.value = name;
-        if (cameraInput) cameraInput.value = name;
-
-        const chip1 = document.getElementById('workerSuggestionChip1');
-        const chip2 = document.getElementById('workerSuggestionChip2');
-        const txt1 = document.getElementById('suggestedWorkerText1');
-        const txt2 = document.getElementById('suggestedWorkerText2');
-
-        if (name) {
-            if (txt1) txt1.textContent = name;
-            if (txt2) txt2.textContent = name;
-            if (chip1) chip1.style.display = 'inline-flex';
-            if (chip2) chip2.style.display = 'inline-flex';
-        }
-    }
-
-    function updateWorkerSuggestions(name) {
-        const datalist = document.getElementById('workerSuggestionsList');
-        if (!datalist) return;
-        datalist.innerHTML = '';
-        if (name) {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.label = '（上次使用的技術員）';
-            datalist.appendChild(opt);
-        }
-    }
-
-    function loadSavedCredentials() {
-        const savedName = localStorage.getItem('ael_worker_name');
-        if (savedName) {
-            syncWorkerNameFields(savedName);
-            updateWorkerSuggestions(savedName);
-        }
-        checkPasswordSuggestion();
-    }
-
-    function resetSavedCredentials() {
-        if (confirm('確定要清除已儲存的密碼與技術員姓名嗎？')) {
-            localStorage.removeItem('ael_auth_authenticated');
-            localStorage.removeItem('ael_saved_password');
-            localStorage.removeItem('ael_worker_name');
-            sessionStorage.removeItem('inspectionData');
-            alert('已成功清除紀錄！');
-            location.reload();
-        }
-    }
-
-    function getDeviceInfo() {
-        const ua = navigator.userAgent;
-        let deviceType = "Desktop";
-        let os = "Unknown";
-        let browser = "Unknown";
-
-        if (/android/i.test(ua)) {
-            os = "Android";
-            deviceType = "Mobile";
-        } else if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-            os = "iOS";
-            deviceType = (navigator.platform === 'MacIntel' || /iPad/.test(ua)) ? "Tablet" : "Mobile";
-        } else if (/Windows/i.test(ua)) {
-            os = "Windows";
-        } else if (/Macintosh/i.test(ua)) {
-            os = "macOS";
-        } else if (/Linux/i.test(ua)) {
-            os = "Linux";
-        }
-
-        if (/mobile/i.test(ua) && deviceType === "Desktop") {
-            deviceType = "Mobile";
-        }
-
-        if (/chrome|crios|crmo/i.test(ua) && !/edg|opr\//i.test(ua)) {
-            browser = "Chrome";
-        } else if (/safari/i.test(ua) && !/chrome|crios|crmo/i.test(ua)) {
-            browser = "Safari";
-        } else if (/edg/i.test(ua)) {
-            browser = "Edge";
-        } else if (/firefox|fxios/i.test(ua)) {
-            browser = "Firefox";
-        }
-
-        return {
-            type: deviceType,
-            os: os,
-            browser: browser,
-            screenWidth: window.screen ? window.screen.width : null,
-            screenHeight: window.screen ? window.screen.height : null,
-            isTouch: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
-            userAgent: ua
-        };
-    }
-
-    function verifyPassword() {
-        const inputVal = document.getElementById('passwordInput').value;
-        const errDiv = document.getElementById('loginError');
-        
-        if (inputVal === APP_PASSWORD) {
-            errDiv.style.display = 'none';
-            localStorage.setItem('ael_auth_authenticated', 'true');
-            savePassword(inputVal);
-            autoFillAndGoToCamera();
-        } else {
-            errDiv.style.display = 'block';
-            document.getElementById('passwordInput').value = '';
-            document.getElementById('passwordInput').focus();
-        }
-    }
-
-    function checkEnterKey(event) {
-        if (event.key === 'Enter') {
-            verifyPassword();
-        }
-    }
-
     function openDB() {
         return new Promise((resolve, reject) => {
             if (db) return resolve(db);
@@ -801,7 +534,6 @@
                 if (!db.objectStoreNames.contains(STORES.machines)) db.createObjectStore(STORES.machines, { keyPath: 'id', autoIncrement: true });
                 if (!db.objectStoreNames.contains(STORES.machineIds)) db.createObjectStore(STORES.machineIds, { keyPath: 'id', autoIncrement: true });
                 if (!db.objectStoreNames.contains(STORES.photos)) db.createObjectStore(STORES.photos, { keyPath: 'id', autoIncrement: true });
-                if (!db.objectStoreNames.contains(STORES.checkIns)) db.createObjectStore(STORES.checkIns, { keyPath: 'id', autoIncrement: true });
             };
             req.onsuccess = async (ev) => { db = ev.target.result; await seedDefaultData(); resolve(db); };
             req.onerror = (ev) => reject(ev.target.error);
@@ -850,10 +582,9 @@
         document.getElementById(pageId).classList.add('active');
         if (pageId === 'home') checkUnsyncedCount();
         if (pageId === 'service') refreshServiceSelects();
-        if (pageId === 'checkin') getGpsLocation('gpsStatus', 'standalone');
         if (pageId === 'syncSettings') updateUnsyncedStats();
         if (pageId === 'camera') {
-            getGpsLocation('cameraGpsStatus', 'service');
+            getGpsLocation('cameraGpsStatus');
             startCamera();
         } else {
             stopCamera();
@@ -861,43 +592,30 @@
     }
 
     async function checkUnsyncedCount() {
-        const checkins = await getAllRecords(STORES.checkIns);
         const photos = await getAllRecords(STORES.photos);
-
-        const pendingCheckins = checkins.filter(item => !item.synced);
         const pendingPhotos = photos.filter(item => !item.synced);
-
-        const totalUnsynced = pendingCheckins.length + pendingPhotos.length;
         const badge = document.getElementById('unsyncedBadge');
         
-        if (totalUnsynced > 0) {
+        if (pendingPhotos.length > 0) {
             badge.style.display = 'inline-block';
-            badge.textContent = `${totalUnsynced} 待同步`;
+            badge.textContent = `${pendingPhotos.length} 待同步`;
         } else {
             badge.style.display = 'none';
         }
     }
 
     async function updateUnsyncedStats() {
-        const checkins = await getAllRecords(STORES.checkIns);
         const photos = await getAllRecords(STORES.photos);
-
-        const pendingCheckins = checkins.filter(item => !item.synced);
         const pendingPhotos = photos.filter(item => !item.synced);
-
-        document.getElementById('pendingCheckinsCount').textContent = pendingCheckins.length;
         document.getElementById('pendingPhotosCount').textContent = pendingPhotos.length;
     }
 
     async function triggerSyncProcess() {
-        const checkins = await getAllRecords(STORES.checkIns);
         const photos = await getAllRecords(STORES.photos);
-
-        const pendingCheckins = checkins.filter(item => !item.synced);
         const pendingPhotos = photos.filter(item => !item.synced);
 
-        if (pendingCheckins.length === 0 && pendingPhotos.length === 0) {
-            alert('目前所有資料均已同步至雲端！');
+        if (pendingPhotos.length === 0) {
+            alert('目前所有照片均已同步至雲端！');
             return;
         }
 
@@ -906,7 +624,7 @@
         syncBtn.textContent = '⏳ 正在同步上載...';
 
         try {
-            const payload = { checkIns: pendingCheckins, photos: pendingPhotos };
+            const payload = { photos: pendingPhotos };
 
             await fetch(POWER_AUTOMATE_URL, {
                 method: 'POST',
@@ -914,17 +632,12 @@
                 body: JSON.stringify(payload)
             });
 
-            for (const record of pendingCheckins) {
-                record.synced = true;
-                await updateRecord(STORES.checkIns, record);
-            }
-
             for (const record of pendingPhotos) {
                 record.synced = true;
                 await updateRecord(STORES.photos, record);
             }
 
-            alert(`✅ 同步完成！\n已成功將 ${pendingCheckins.length} 筆簽到與 ${pendingPhotos.length} 筆工程照片發送至 Power Automate。`);
+            alert(`✅ 同步完成！\n已成功將 ${pendingPhotos.length} 筆工程照片發送至 Power Automate。`);
         } catch (err) {
             alert('❌ 同步失敗: ' + err.message);
         } finally {
@@ -935,7 +648,7 @@
         }
     }
 
-    function getGpsLocation(elementId = 'gpsStatus', targetData = 'standalone') {
+    function getGpsLocation(elementId = 'cameraGpsStatus') {
         const gpsBox = document.getElementById(elementId);
         if (!gpsBox) return;
 
@@ -956,17 +669,11 @@
                 const lng = position.coords.longitude.toFixed(6);
                 const accuracy = position.coords.accuracy ? position.coords.accuracy.toFixed(1) : null;
                 
-                const locationObj = { 
+                serviceGpsData = { 
                     latitude: position.coords.latitude, 
                     longitude: position.coords.longitude, 
                     accuracy: position.coords.accuracy 
                 };
-
-                if (targetData === 'standalone') {
-                    standaloneGpsData = locationObj;
-                } else {
-                    serviceGpsData = locationObj;
-                }
 
                 gpsBox.innerHTML = `
                     <strong>📍 位置已取得</strong><br>
@@ -978,9 +685,7 @@
                 `;
             },
             (error) => {
-                if (targetData === 'standalone') standaloneGpsData = null;
-                else serviceGpsData = null;
-
+                serviceGpsData = null;
                 gpsBox.style.background = '#fee2e2';
                 gpsBox.style.color = '#991b1b';
                 let msg = '無法獲取位置信息';
@@ -989,24 +694,6 @@
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-    }
-
-    async function submitCheckIn() {
-        const nameInput = document.getElementById('techNameInput');
-        const name = nameInput.value.trim() || '未填寫';
-        saveWorkerName(name);
-
-        const checkInRecord = {
-            techName: name,
-            gps: standaloneGpsData,
-            deviceInfo: getDeviceInfo(),
-            timestamp: new Date().toISOString(),
-            synced: false
-        };
-
-        await addRecord(STORES.checkIns, checkInRecord);
-        alert(`✅ 技術員 [${name}] 簽到成功！`);
-        showPage('home');
     }
 
     async function refreshServiceSelects() {
@@ -1089,9 +776,7 @@
                 const machine = params.get('machine');
                 const machineId = params.get('machineId');
                 const workOrder = params.get('workOrder');
-                const techName = params.get('techName');
 
-                if (techName) saveWorkerName(techName);
                 if (site) setSelectValue('siteSelect', site);
                 if (machine) setSelectValue('machineSelect', machine);
                 if (machineId) setSelectValue('machineIdSelect', machineId);
@@ -1101,7 +786,6 @@
             }
 
             const data = JSON.parse(decodedText);
-            if (data.techName) saveWorkerName(data.techName);
             if (data.site) setSelectValue('siteSelect', data.site);
             if (data.machine) setSelectValue('machineSelect', data.machine);
             if (data.machineId) setSelectValue('machineIdSelect', data.machineId);
@@ -1245,9 +929,6 @@
     function goToConfirmPage() {
         if (tempPhotoArray.length === 0) { alert('請至少選擇或拍攝一張照片！'); return; }
 
-        const techName = document.getElementById('cameraTechNameInput').value.trim() || '未填寫';
-        saveWorkerName(techName);
-
         const gpsText = serviceGpsData 
             ? `${serviceGpsData.latitude.toFixed(4)}, ${serviceGpsData.longitude.toFixed(4)} (±${serviceGpsData.accuracy ? serviceGpsData.accuracy.toFixed(1) + 'm' : '未知'})` 
             : '未取得定位';
@@ -1260,7 +941,6 @@
             workOrder: document.getElementById('workOrderInput').value || '未填寫'
         };
 
-        document.getElementById('summaryTechName').textContent = techName;
         document.getElementById('summaryGps').textContent = gpsText;
         document.getElementById('summarySite').textContent = inspectionData.site;
         document.getElementById('summaryMachine').textContent = inspectionData.machine;
@@ -1308,9 +988,6 @@
     }
 
     async function confirmAndUploadPhotos() {
-        const techName = document.getElementById('cameraTechNameInput').value.trim() || "未填寫";
-        saveWorkerName(techName);
-
         const rawData = sessionStorage.getItem('inspectionData');
         const formData = rawData ? JSON.parse(rawData) : {
             site: document.getElementById('siteSelect').value || "未填寫",
@@ -1331,7 +1008,6 @@
         }
 
         const timestamp = new Date().toISOString();
-        const deviceInfo = getDeviceInfo();
 
         if (tempPhotoArray.length === 0) {
             alert("沒有可儲存的照片！");
@@ -1349,7 +1025,6 @@
         }));
 
         const payload = {
-            techName: techName,
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
             site: formData.site,
             machine: formData.machine,
@@ -1357,7 +1032,6 @@
             workOrder: formData.workOrder,
             issueType: issueType,
             timestamp: timestamp,
-            deviceInfo: deviceInfo,
             photos: photoItems
         };
 
@@ -1402,39 +1076,30 @@
         }
     }
 
-    async function autoFillAndGoToCamera() {
+    async function autoFillAndGoToService() {
         const urlParams = new URLSearchParams(window.location.search);
 
-        const techName = urlParams.get('techName');
         const site = urlParams.get('site');
         const machine = urlParams.get('machine');
         const machineId = urlParams.get('machineId');
         const workOrder = urlParams.get('workOrder');
 
-        const hasEmbedParams = techName || site || machine || machineId || workOrder;
+        const hasEmbedParams = site || machine || machineId || workOrder;
 
         if (hasEmbedParams) {
-            if (techName) {
-                saveWorkerName(techName);
-            }
             if (site) setSelectValue('siteSelect', site);
             if (machine) setSelectValue('machineSelect', machine);
             if (machineId) setSelectValue('machineIdSelect', machineId);
             if (workOrder) document.getElementById('workOrderInput').value = workOrder;
 
-            prepareAndShowCamera();
+            showPage('service');
         } else {
             showPage('home');
         }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
-        loadSavedCredentials();
-
-        const isAuth = localStorage.getItem('ael_auth_authenticated');
-        if (isAuth === 'true') {
-            autoFillAndGoToCamera();
-        }
+        autoFillAndGoToService();
     });
 
     openDB().then(() => {
