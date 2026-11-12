@@ -474,9 +474,9 @@
     const DB_VERSION = 6;
     const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos' };
 
-    const DEFAULT_SITES = ["上水救護站", "AIA TOWER", "九龍塘消防局", "黃大仙警署"];
-    const DEFAULT_MACHINES = ["傳統水泵", "加壓水泵", "潛水式水泵"];
-    const DEFAULT_MACHINE_IDS = ["WP30848", "10337628-01", "SHK-WP30999"];
+    const DEFAULT_SITES = ["TEST"];
+    const DEFAULT_MACHINES = ["TEST"];
+    const DEFAULT_MACHINE_IDS = ["TEST"];
 
     let db = null;
     let tempPhotoArray = [];
@@ -641,6 +641,59 @@
         }
     }
 
+    function firstStoredValue(record, keys, fallback = '') {
+        for (const key of keys) {
+            const value = record?.[key];
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+                return String(value).trim();
+            }
+        }
+        return fallback;
+    }
+
+    function normalizeStoredRecord(record) {
+        return {
+            site: firstStoredValue(record, ['site', 'venue', 'Venue', '場地名稱']),
+            machine: firstStoredValue(record, ['machine', 'Machine', '設備名稱']),
+            machineId: firstStoredValue(record, ['machineId', 'MachineID', 'machineID', '機器編號']),
+            workOrder: firstStoredValue(record, ['workOrder', 'WorkOrder', '工作編號']),
+            modifyDateTime: firstStoredValue(record, ['modifyDateTime', 'dateTime', 'DateTime', 'Date & Time', '修改日期時間']),
+            issueType: firstStoredValue(record, ['issueType', 'failMode', 'FailMode', 'Fail mode', '故障類型']),
+            gps: record?.gps || { latitude: null, longitude: null, accuracy: null },
+            timestamp: record?.timestamp || new Date().toISOString()
+        };
+    }
+
+    function buildPowerAutomatePayload(data, photos) {
+        const normalized = normalizeStoredRecord(data);
+
+        return {
+            // Original field names used by the app
+            gps: normalized.gps,
+            site: normalized.site,
+            machine: normalized.machine,
+            machineId: normalized.machineId,
+            workOrder: normalized.workOrder,
+            modifyDateTime: normalized.modifyDateTime,
+            issueType: normalized.issueType,
+            timestamp: normalized.timestamp,
+            photos: photos,
+
+            // Compatibility aliases for Power Automate / Excel mappings
+            venue: normalized.site,
+            Venue: normalized.site,
+            Machine: normalized.machine,
+            failMode: normalized.issueType,
+            FailMode: normalized.issueType,
+            'Fail mode': normalized.issueType,
+            dateTime: normalized.modifyDateTime,
+            DateTime: normalized.modifyDateTime,
+            'Date & Time': normalized.modifyDateTime,
+            MachineID: normalized.machineId,
+            WorkOrder: normalized.workOrder
+        };
+    }
+
     async function updateUnsyncedStats() {
         // Read all locally stored records
         const photos = await getAllRecords(STORES.photos);
@@ -694,12 +747,12 @@
                 <div style="font-weight:700; color:#0f172a; margin-bottom:6px;">
                     📋 待同步記錄 ${index + 1}
                 </div>
-                <div><strong>📍 Venue:</strong> ${record.site || '--'}</div>
-                <div><strong>⚙️ Machine:</strong> ${record.machine || '--'}</div>
-                <div><strong>⚠️ Fail mode:</strong> ${record.issueType || '--'}</div>
-                <div><strong>📅 Date & Time:</strong> ${record.modifyDateTime || '--'}</div>
-                <div><strong>🔢 Machine ID:</strong> ${record.machineId || '--'}</div>
-                <div><strong>📝 Work Order:</strong> ${record.workOrder || '--'}</div>
+                <div><strong>📍 Venue:</strong> ${firstStoredValue(record, ['site', 'venue', 'Venue', '場地名稱'], '--')}</div>
+                <div><strong>⚙️ Machine:</strong> ${firstStoredValue(record, ['machine', 'Machine', '設備名稱'], '--')}</div>
+                <div><strong>⚠️ Fail mode:</strong> ${firstStoredValue(record, ['issueType', 'failMode', 'FailMode', 'Fail mode', '故障類型'], '--')}</div>
+                <div><strong>📅 Date & Time:</strong> ${firstStoredValue(record, ['modifyDateTime', 'dateTime', 'DateTime', 'Date & Time', '修改日期時間'], '--')}</div>
+                <div><strong>🔢 Machine ID:</strong> ${firstStoredValue(record, ['machineId', 'MachineID', 'machineID', '機器編號'], '--')}</div>
+                <div><strong>📝 Work Order:</strong> ${firstStoredValue(record, ['workOrder', 'WorkOrder', '工作編號'], '--')}</div>
                 <div style="
                     margin-top:8px;
                     padding-top:8px;
@@ -728,21 +781,51 @@
         syncBtn.disabled = true;
         syncBtn.textContent = '⏳ 正在同步上載...';
 
-        try {
-            const payload = { photos: pendingPhotos };
+        let syncedCount = 0;
 
-            await fetch(POWER_AUTOMATE_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+        try {
+            // Records saved from one submission share the same timestamp.
+            // Group them so normal upload and retry upload use the same JSON structure.
+            const groups = new Map();
+
+            pendingPhotos.forEach((record) => {
+                const key = record.timestamp || `legacy-${record.id}`;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(record);
             });
 
-            for (const record of pendingPhotos) {
-                record.synced = true;
-                await updateRecord(STORES.photos, record);
+            for (const records of groups.values()) {
+                const baseRecord = records[0];
+                const photoItems = records.map((record, index) => ({
+                    photoIndex: record.photoIndex || index + 1,
+                    photoBase64: record.photoBase64 || record.photos?.[index]?.photoBase64 || ''
+                })).filter(item => item.photoBase64);
+
+                const payload = buildPowerAutomatePayload(baseRecord, photoItems);
+
+                if (!payload.site || !payload.machine || !payload.issueType || !payload.modifyDateTime) {
+                    console.warn('This local record is missing metadata and cannot be reconstructed:', baseRecord);
+                }
+
+                const response = await fetch(POWER_AUTOMATE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Power Automate returned HTTP ${response.status}`);
+                }
+
+                // Mark only the records accepted by Power Automate as synced.
+                for (const record of records) {
+                    record.synced = true;
+                    await updateRecord(STORES.photos, record);
+                    syncedCount++;
+                }
             }
 
-            alert(`✅ 同步完成！\n已成功將 ${pendingPhotos.length} 筆工程照片發送至 Power Automate。`);
+            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片發送至 Power Automate。`);
         } catch (err) {
             alert('❌ 同步失敗: ' + err.message);
         } finally {
@@ -752,7 +835,6 @@
             checkUnsyncedCount();
         }
     }
-
     function getGpsLocation(elementId = 'cameraGpsStatus') {
         const gpsBox = document.getElementById(elementId);
         if (!gpsBox) return;
@@ -1140,7 +1222,7 @@
             photoBase64: photoBase64
         }));
 
-        const payload = {
+        const payload = buildPowerAutomatePayload({
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
             site: formData.site,
             machine: formData.machine,
@@ -1148,9 +1230,8 @@
             workOrder: formData.workOrder,
             modifyDateTime: modifyDateTime,
             issueType: issueType,
-            timestamp: timestamp,
-            photos: photoItems
-        };
+            timestamp: timestamp
+        }, photoItems);
 
         try {
             for (const item of photoItems) {
