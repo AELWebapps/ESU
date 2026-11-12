@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ael-maintenance-v2';
+const CACHE_NAME = 'ael-maintenance-v3';
+
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -8,8 +9,11 @@ const STATIC_ASSETS = [
 // Install: Cache core assets and take control immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
+
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS);
+    })
   );
 });
 
@@ -26,29 +30,96 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: Bypass cache for POST requests; Network-First for HTML; Cache-First for libraries
+// Fetch handling
 self.addEventListener('fetch', (event) => {
-  // Never cache POST requests (Power Automate webhooks / data sync)
-  if (event.request.method !== 'GET') return;
 
-  // Network-First for HTML pages so users always get the latest UI
-  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          return networkResponse;
-        })
-        .catch(() => caches.match(event.request))
-    );
+  // IMPORTANT:
+  // Never cache POST/PUT/PATCH/DELETE requests.
+  // Power Automate sync requests go directly to the network.
+  if (event.request.method !== 'GET') {
     return;
   }
 
-  // Cache-First for external libraries and static resources (e.g., html5-qrcode)
+  const request = event.request;
+  const acceptHeader = request.headers.get('accept') || '';
+
+  // HTML pages:
+  // Network First so the latest version of the app is loaded.
+  if (
+    request.mode === 'navigate' ||
+    acceptHeader.includes('text/html')
+  ) {
+
+    event.respondWith(
+      fetch(request)
+
+        .then((networkResponse) => {
+
+          // Only cache successful responses
+          if (networkResponse && networkResponse.ok) {
+
+            const responseClone = networkResponse.clone();
+
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+
+          }
+
+          return networkResponse;
+        })
+
+        .catch(async () => {
+
+          // If offline, try exact cached page
+          const cachedResponse =
+            await caches.match(request);
+
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+
+          // Final offline fallback
+          return caches.match('./index.html');
+
+        })
+    );
+
+    return;
+  }
+
+  // Other static resources:
+  // Cache First, then network
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request);
+
+    caches.match(request).then((cachedResponse) => {
+
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(request).then((networkResponse) => {
+
+        if (
+          networkResponse &&
+          networkResponse.ok
+        ) {
+
+          const responseClone =
+            networkResponse.clone();
+
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
+          });
+
+        }
+
+        return networkResponse;
+
+      });
+
     })
+
   );
+
 });
