@@ -378,6 +378,14 @@
             </div>
 
             <div class="label-container">
+                <span class="num-badge">📅</span>
+                <span class="field-label">修改日期時間</span>
+                <span class="required">*</span>
+            </div>
+            <div class="sub-text">如現場即時未能上載，請輸入當時日期時間</div>
+            <input type="text" id="modifyDateTimeInput" class="input" placeholder="例如：2026-11-12 10:55:00">
+
+            <div class="label-container">
                 <span class="num-badge">⚠️</span>
                 <span class="field-label">故障類型</span>
                 <span class="required">*</span>
@@ -522,6 +530,17 @@
             container.style.display = 'none';
             input.value = '';
         }
+    }
+
+    function getFormattedCurrentDateTime() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     }
 
     function openDB() {
@@ -947,6 +966,9 @@
         document.getElementById('summaryReg').textContent = inspectionData.machineId;
         document.getElementById('summaryWo').textContent = inspectionData.workOrder;
 
+        // 自動填入當前日期時間到修改日期欄位
+        document.getElementById('modifyDateTimeInput').value = getFormattedCurrentDateTime();
+
         document.getElementById('issueTypeSelect').value = '沒有問題';
         toggleOtherIssueInput();
 
@@ -996,6 +1018,13 @@
             workOrder: document.getElementById('workOrderInput').value || "無工作編號"
         };
 
+        const modifyDateTime = document.getElementById('modifyDateTimeInput').value.trim();
+        if (!modifyDateTime) {
+            alert('請填寫修改日期時間！');
+            document.getElementById('modifyDateTimeInput').focus();
+            return;
+        }
+
         let issueType = document.getElementById('issueTypeSelect').value;
         if (issueType === '其他') {
             const otherDetail = document.getElementById('otherIssueInput').value.trim();
@@ -1030,6 +1059,7 @@
             machine: formData.machine,
             machineId: formData.machineId,
             workOrder: formData.workOrder,
+            modifyDateTime: modifyDateTime,
             issueType: issueType,
             timestamp: timestamp,
             photos: photoItems
@@ -1063,7 +1093,9 @@
                 
                 tempPhotoArray = [];
                 document.getElementById('workOrderInput').value = '';
-                showPage('service');
+                
+                // 上載完成退回主頁
+                showPage('home');
             } else {
                 alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})。\n照片與資料已儲存至本地備份，您可以前往「雲端同步中心」重新同步。`);
             }
