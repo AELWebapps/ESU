@@ -474,9 +474,9 @@
     const DB_VERSION = 6;
     const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos' };
 
-    const DEFAULT_SITES = ["上水救護站", "AIA TOWER", "九龍塘消防局", "黃大仙警署"];
-    const DEFAULT_MACHINES = ["傳統水泵", "加壓水泵", "潛水式水泵"];
-    const DEFAULT_MACHINE_IDS = ["WP30848", "10337628-01", "SHK-WP30999"];
+    const DEFAULT_SITES = ["TEST"];
+    const DEFAULT_MACHINES = ["TEST"];
+    const DEFAULT_MACHINE_IDS = ["TEST"];
 
     let db = null;
     let tempPhotoArray = [];
@@ -641,6 +641,57 @@
         }
     }
 
+    function firstStoredValue(record, keys, fallback = '') {
+        for (const key of keys) {
+            const value = record?.[key];
+            if (value !== undefined && value !== null && String(value).trim() !== '') {
+                return String(value).trim();
+            }
+        }
+        return fallback;
+    }
+
+    function normalizeStoredRecord(record) {
+        return {
+            site: firstStoredValue(record, ['site', 'venue', 'Venue', '場地名稱']),
+            machine: firstStoredValue(record, ['machine', 'Machine', '設備名稱']),
+            machineId: firstStoredValue(record, ['machineId', 'machineID', 'MachineID', '機器編號']),
+            workOrder: firstStoredValue(record, ['workOrder', 'WorkOrder', 'wo', '工作編號']),
+            modifyDateTime: firstStoredValue(record, ['modifyDateTime', 'dateTime', 'DateTime', 'Date & Time', '修改日期時間']),
+            issueType: firstStoredValue(record, ['issueType', 'failMode', 'FailMode', 'Fail mode', '故障類型']),
+            gps: record?.gps || { latitude: null, longitude: null, accuracy: null },
+            timestamp: record?.timestamp || new Date().toISOString()
+        };
+    }
+
+    function buildPowerAutomatePayload(data, photos) {
+        const value = normalizeStoredRecord(data);
+        return {
+            gps: value.gps,
+            site: value.site,
+            machine: value.machine,
+            machineId: value.machineId,
+            workOrder: value.workOrder,
+            modifyDateTime: value.modifyDateTime,
+            issueType: value.issueType,
+            timestamp: value.timestamp,
+            photos: photos,
+
+            // Compatibility names for existing Power Automate / Excel mappings
+            venue: value.site,
+            Venue: value.site,
+            Machine: value.machine,
+            failMode: value.issueType,
+            FailMode: value.issueType,
+            'Fail mode': value.issueType,
+            dateTime: value.modifyDateTime,
+            DateTime: value.modifyDateTime,
+            'Date & Time': value.modifyDateTime,
+            MachineID: value.machineId,
+            WorkOrder: value.workOrder
+        };
+    }
+
     async function updateUnsyncedStats() {
         // Read all locally stored records
         const photos = await getAllRecords(STORES.photos);
@@ -694,12 +745,12 @@
                 <div style="font-weight:700; color:#0f172a; margin-bottom:6px;">
                     📋 待同步記錄 ${index + 1}
                 </div>
-                <div><strong>📍 Venue:</strong> ${record.site || '--'}</div>
-                <div><strong>⚙️ Machine:</strong> ${record.machine || '--'}</div>
-                <div><strong>⚠️ Fail mode:</strong> ${record.issueType || '--'}</div>
-                <div><strong>📅 Date & Time:</strong> ${record.modifyDateTime || '--'}</div>
-                <div><strong>🔢 Machine ID:</strong> ${record.machineId || '--'}</div>
-                <div><strong>📝 Work Order:</strong> ${record.workOrder || '--'}</div>
+                <div><strong>📍 Venue:</strong> ${firstStoredValue(record, ['site', 'venue', 'Venue', '場地名稱'], '--')}</div>
+                <div><strong>⚙️ Machine:</strong> ${firstStoredValue(record, ['machine', 'Machine', '設備名稱'], '--')}</div>
+                <div><strong>⚠️ Fail mode:</strong> ${firstStoredValue(record, ['issueType', 'failMode', 'FailMode', 'Fail mode', '故障類型'], '--')}</div>
+                <div><strong>📅 Date & Time:</strong> ${firstStoredValue(record, ['modifyDateTime', 'dateTime', 'DateTime', 'Date & Time', '修改日期時間'], '--')}</div>
+                <div><strong>🔢 Machine ID:</strong> ${firstStoredValue(record, ['machineId', 'machineID', 'MachineID', '機器編號'], '--')}</div>
+                <div><strong>📝 Work Order:</strong> ${firstStoredValue(record, ['workOrder', 'WorkOrder', 'wo', '工作編號'], '--')}</div>
                 <div style="
                     margin-top:8px;
                     padding-top:8px;
@@ -727,22 +778,47 @@
         const syncBtn = document.getElementById('syncBtn');
         syncBtn.disabled = true;
         syncBtn.textContent = '⏳ 正在同步上載...';
+        let syncedCount = 0;
 
         try {
-            const payload = { photos: pendingPhotos };
-
-            await fetch(POWER_AUTOMATE_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            const groups = new Map();
+            pendingPhotos.forEach(record => {
+                const key = record.timestamp || `legacy-${record.id}`;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(record);
             });
 
-            for (const record of pendingPhotos) {
-                record.synced = true;
-                await updateRecord(STORES.photos, record);
+            for (const records of groups.values()) {
+                const baseRecord = records[0];
+                const photoItems = records.map((record, index) => ({
+                    photoIndex: record.photoIndex || index + 1,
+                    photoBase64: record.photoBase64 || ''
+                })).filter(item => item.photoBase64);
+
+                const payload = buildPowerAutomatePayload(baseRecord, photoItems);
+
+                if (!payload.site || !payload.machine || !payload.issueType || !payload.modifyDateTime) {
+                    console.warn('Pending local record has missing metadata:', baseRecord);
+                }
+
+                const response = await fetch(POWER_AUTOMATE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Power Automate returned HTTP ${response.status}`);
+                }
+
+                for (const record of records) {
+                    record.synced = true;
+                    await updateRecord(STORES.photos, record);
+                    syncedCount++;
+                }
             }
 
-            alert(`✅ 同步完成！\n已成功將 ${pendingPhotos.length} 筆工程照片發送至 Power Automate。`);
+            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片發送至 Power Automate。`);
         } catch (err) {
             alert('❌ 同步失敗: ' + err.message);
         } finally {
@@ -752,7 +828,6 @@
             checkUnsyncedCount();
         }
     }
-
     function getGpsLocation(elementId = 'cameraGpsStatus') {
         const gpsBox = document.getElementById(elementId);
         if (!gpsBox) return;
@@ -1194,7 +1269,7 @@
             photoBase64: photoBase64
         }));
 
-        const payload = {
+        const payload = buildPowerAutomatePayload({
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
             site: formData.site,
             machine: formData.machine,
@@ -1202,9 +1277,8 @@
             workOrder: formData.workOrder,
             modifyDateTime: modifyDateTime,
             issueType: issueType,
-            timestamp: timestamp,
-            photos: photoItems
-        };
+            timestamp: timestamp
+        }, photoItems);
 
         try {
             for (const item of photoItems) {
@@ -1224,8 +1298,10 @@
 
             if (response.ok) {
                 const localPhotos = await getAllRecords(STORES.photos);
-                const unSyncedList = localPhotos.filter(p => !p.synced);
-                for (const p of unSyncedList) {
+                const currentSubmission = localPhotos.filter(p =>
+                    !p.synced && p.timestamp === timestamp
+                );
+                for (const p of currentSubmission) {
                     p.synced = true;
                     await updateRecord(STORES.photos, p);
                 }
@@ -1251,10 +1327,12 @@
     async function autoFillAndGoToService() {
         const urlParams = new URLSearchParams(window.location.search);
 
-        const site = urlParams.get('site');
-        const machine = urlParams.get('machine');
-        const machineId = urlParams.get('machineId');
-        const workOrder = urlParams.get('workOrder');
+        const site = recoverSiteFromNestedUrl(
+            getQrParam(urlParams, ['site', 'venue', 'Venue', '場地名稱'])
+        );
+        const machine = getQrParam(urlParams, ['machine', 'Machine', '設備名稱']);
+        const machineId = getQrParam(urlParams, ['machineId', 'machineID', 'MachineID', '機器編號']);
+        const workOrder = getQrParam(urlParams, ['workOrder', 'WorkOrder', 'wo', '工作編號']);
 
         const hasEmbedParams = site || machine || machineId || workOrder;
 
