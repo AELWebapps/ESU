@@ -433,9 +433,12 @@
             <div id="confirmPreviewGrid" class="photo-grid"></div>
         </div>
 
-        <div class="grid2">
+        <div style="display:flex; flex-direction:column; gap:8px;">
             <button class="btn primary" onclick="confirmAndUploadPhotos()">🚀 全部儲存</button>
-            <button class="btn secondary" onclick="showPage('camera')">繼續拍攝</button>
+            <div class="grid2">
+                <button class="btn secondary" onclick="showPage('camera')">繼續拍攝</button>
+                <button class="btn secondary" onclick="showPage('home')">🏠 返回主頁</button>
+            </div>
         </div>
     </div>
 
@@ -831,7 +834,6 @@
             if (parts.length >= 4 && parts[3]) document.getElementById('workOrderInput').value = parts[3];
         }
 
-        // 解析完畢後直接進入 📷 拍攝相片 頁面
         prepareAndShowCamera();
     }
 
