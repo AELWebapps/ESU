@@ -445,8 +445,19 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Service Worker 已成功註冊。', reg))
+                .then(reg => {
+                    console.log('Service Worker 已成功註冊。', reg);
+                    reg.update();
+                })
                 .catch(err => console.error('Service Worker 註冊失敗:', err));
+        });
+
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
         });
     }
 
@@ -456,9 +467,9 @@
     const DB_VERSION = 6;
     const STORES = { sites: 'projectSites', machines: 'machines', machineIds: 'machineIds', photos: 'photos' };
 
-    const DEFAULT_SITES = ["TEST"];
-    const DEFAULT_MACHINES = ["TEST"];
-    const DEFAULT_MACHINE_IDS = ["TEST"];
+    const DEFAULT_SITES = ["上水救護站", "AIA TOWER", "九龍塘消防局", "黃大仙警署"];
+    const DEFAULT_MACHINES = ["傳統水泵", "加壓水泵", "潛水式水泵"];
+    const DEFAULT_MACHINE_IDS = ["WP30848", "10337628-01", "SHK-WP30999"];
 
     let db = null;
     let tempPhotoArray = [];
@@ -784,7 +795,6 @@
 
     function onScanSuccess(decodedText) {
         stopQrScanner();
-        alert('解析 QR Code 成功！');
 
         try {
             if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
@@ -801,6 +811,7 @@
                 if (machineId) setSelectValue('machineIdSelect', machineId);
                 if (workOrder) document.getElementById('workOrderInput').value = workOrder;
 
+                prepareAndShowCamera();
                 return;
             }
 
@@ -819,6 +830,9 @@
             if (parts.length >= 3 && parts[2]) setSelectValue('machineIdSelect', parts[2]);
             if (parts.length >= 4 && parts[3]) document.getElementById('workOrderInput').value = parts[3];
         }
+
+        // 解析完畢後直接進入 📷 拍攝相片 頁面
+        prepareAndShowCamera();
     }
 
     function onScanFailure(error) {}
@@ -966,7 +980,6 @@
         document.getElementById('summaryReg').textContent = inspectionData.machineId;
         document.getElementById('summaryWo').textContent = inspectionData.workOrder;
 
-        // 自動填入當前日期時間到修改日期欄位
         document.getElementById('modifyDateTimeInput').value = getFormattedCurrentDateTime();
 
         document.getElementById('issueTypeSelect').value = '沒有問題';
@@ -1094,7 +1107,6 @@
                 tempPhotoArray = [];
                 document.getElementById('workOrderInput').value = '';
                 
-                // 上載完成退回主頁
                 showPage('home');
             } else {
                 alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})。\n照片與資料已儲存至本地備份，您可以前往「雲端同步中心」重新同步。`);
@@ -1124,7 +1136,7 @@
             if (machineId) setSelectValue('machineIdSelect', machineId);
             if (workOrder) document.getElementById('workOrderInput').value = workOrder;
 
-            showPage('service');
+            prepareAndShowCamera();
         } else {
             showPage('home');
         }
