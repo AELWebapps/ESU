@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>AEL 維護系統 (多通道上傳)</title>
+    <title>AEL 維護系統 (Power Automate + Google Backup)</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <style>
@@ -251,7 +251,7 @@
     <div id="syncSettings" class="screen">
         <div class="card">
             <h3>☁️ 雲端同步中心</h3>
-            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至當前選擇的雲端通道。</div>
+            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至 Power Automate（如失敗則自動備份至 Google Apps Script）。</div>
             
             <div style="font-size:14px; line-height:1.8; color:#334151; background:#e2e8f0; padding:14px; border-radius:10px; border:1px solid #cbd5e1;">
                 • 待同步工程照片/資料：<strong id="pendingPhotosCount">0</strong> 筆
@@ -384,9 +384,9 @@
             <!-- 上傳通道切換按鈕 -->
             <div class="label-container">
                 <span class="num-badge">🔄</span>
-                <span class="field-label">上傳通道選擇</span>
+                <span class="field-label">優先上傳通道</span>
             </div>
-            <div class="sub-text">您可以隨時切換上傳目標伺服器</div>
+            <div class="sub-text">預設優先使用 Power Automate，失敗時自動切換至 Google Apps Script</div>
             <div class="grid2" style="margin-bottom: 12px;">
                 <button type="button" id="endpointPaBtn" class="btn primary" onclick="setEndpoint('pa')">⚡ Power Automate</button>
                 <button type="button" id="endpointGasBtn" class="btn secondary" onclick="setEndpoint('gas')">🟢 Google Apps Script</button>
@@ -482,7 +482,6 @@
     const POWER_AUTOMATE_URL = "https://3685358de1b2e6f89344b173ee068c.8f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/1ca055e3b77f4a08bb3f70f9f34e0aef/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=7yKFsQX_D6yiPiPIDGWCwvUCeIQL1dEVWAgf0wFf-Oc";
     const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVKqGPqyFdBS8Ezo7iIWVKy3Vj4Clv779os5M7_0TGPq5asIGpekqEm6HClvNMWIhwSg/exec";
 
-    // 當前選擇的上傳通道 ('pa' 代表 Power Automate, 'gas' 代表 Google Apps Script)
     let selectedEndpoint = 'pa';
 
     function setEndpoint(type) {
@@ -695,6 +694,18 @@
 
     function buildPayload(data, photos) {
         const value = normalizeStoredRecord(data);
+        const enrichedPhotos = photos.map(p => ({
+            photoIndex: p.photoIndex || 1,
+            photoBase64: p.photoBase64 || '',
+            site: value.site,
+            machine: value.machine,
+            machineId: value.machineId,
+            workOrder: value.workOrder,
+            modifyDateTime: value.modifyDateTime,
+            issueType: value.issueType,
+            timestamp: value.timestamp
+        }));
+
         return {
             gps: value.gps,
             site: value.site,
@@ -704,7 +715,7 @@
             modifyDateTime: value.modifyDateTime,
             issueType: value.issueType,
             timestamp: value.timestamp,
-            photos: photos,
+            photos: enrichedPhotos,
             checkIns: [],
 
             // Compatibility names
@@ -722,20 +733,24 @@
         };
     }
 
-    // 根據當前選擇的通道發送請求，若當前選的主通道失敗則自動嘗試備援通道
     async function sendPayloadToCloud(payload) {
         const primaryUrl = (selectedEndpoint === 'pa') ? POWER_AUTOMATE_URL : APPS_SCRIPT_URL;
         const backupUrl = (selectedEndpoint === 'pa') ? APPS_SCRIPT_URL : POWER_AUTOMATE_URL;
         const primaryName = (selectedEndpoint === 'pa') ? 'Power Automate' : 'Google Apps Script';
         const backupName = (selectedEndpoint === 'pa') ? 'Google Apps Script' : 'Power Automate';
 
-        const isGas = (url) => url.includes('script.google.com');
+        const getHeaders = (url) => {
+            if (url.includes('script.google.com')) {
+                return { 'Content-Type': 'text/plain;charset=utf-8' };
+            }
+            return { 'Content-Type': 'application/json' };
+        };
 
         try {
-            console.log(`嘗試上傳至 ${primaryName}...`);
+            console.log(`嘗試上傳至主要通道 (${primaryName})...`);
             const response = await fetch(primaryUrl, {
                 method: 'POST',
-                headers: isGas(primaryUrl) ? { 'Content-Type': 'text/plain;charset=utf-8' } : { 'Content-Type': 'application/json' },
+                headers: getHeaders(primaryUrl),
                 body: JSON.stringify(payload)
             });
 
@@ -749,7 +764,7 @@
             try {
                 const backupResponse = await fetch(backupUrl, {
                     method: 'POST',
-                    headers: isGas(backupUrl) ? { 'Content-Type': 'text/plain;charset=utf-8' } : { 'Content-Type': 'application/json' },
+                    headers: getHeaders(backupUrl),
                     body: JSON.stringify(payload)
                 });
 
@@ -857,14 +872,7 @@
                 const baseRecord = records[0];
                 const photoItems = records.map((record, index) => ({
                     photoIndex: record.photoIndex || index + 1,
-                    photoBase64: record.photoBase64 || '',
-                    site: baseRecord.site,
-                    machine: baseRecord.machine,
-                    machineId: baseRecord.machineId,
-                    workOrder: baseRecord.workOrder,
-                    modifyDateTime: baseRecord.modifyDateTime,
-                    issueType: baseRecord.issueType,
-                    timestamp: baseRecord.timestamp
+                    photoBase64: record.photoBase64 || ''
                 })).filter(item => item.photoBase64);
 
                 const payload = buildPayload(baseRecord, photoItems);
@@ -1392,7 +1400,7 @@
             if (site) setSelectValue('siteSelect', site);
             if (machine) setSelectValue('machineSelect', machine);
             if (machineId) setSelectValue('machineIdSelect', machineId);
-            if (workOrder) document.getElementById('workOrderInput').value = workOrder;
+            if (workOrder) setSelectValue('workOrderInput', workOrder);
 
             prepareAndShowCamera();
         } else {
