@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>AEL 維護系統 (Power Automate)</title>
+    <title>AEL 維護系統 (Power Automate + Google Backup)</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <style>
@@ -250,8 +250,8 @@
     <!-- 雲端同步中心頁面 -->
     <div id="syncSettings" class="screen">
         <div class="card">
-            <h3>☁️ Power Automate 雲端同步</h3>
-            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至 Power Automate。</div>
+            <h3>☁️ 雲端同步中心</h3>
+            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至 Power Automate（如失敗則自動備份至 Google Drive）。</div>
             
             <div style="font-size:14px; line-height:1.8; color:#334151; background:#e2e8f0; padding:14px; border-radius:10px; border:1px solid #cbd5e1;">
                 • 待同步工程照片/資料：<strong id="pendingPhotosCount">0</strong> 筆
@@ -468,7 +468,11 @@
         });
     }
 
+    // 主要端點：Power Automate
     const POWER_AUTOMATE_URL = "https://3685358de1b2e6f89344b173ee068c.8f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/1ca055e3b77f4a08bb3f70f9f34e0aef/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=7yKFsQX_D6yiPiPIDGWCwvUCeIQL1dEVWAgf0wFf-Oc";
+    
+    // 備援端點：Google Apps Script
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKFsOdOD_xLUx7FMN-nsEhQzHo9xEu4_UvbqNn40wKR7JjiY-I-byqRWpgl27CmcKO/exec";
 
     const DB_NAME = 'AEL_MaintenanceDB';
     const DB_VERSION = 6;
@@ -676,6 +680,7 @@
             issueType: value.issueType,
             timestamp: value.timestamp,
             photos: photos,
+            checkIns: [],
 
             // Compatibility names for existing Power Automate / Excel mappings
             venue: value.site,
@@ -692,23 +697,52 @@
         };
     }
 
-    async function updateUnsyncedStats() {
-        // Read all locally stored records
-        const photos = await getAllRecords(STORES.photos);
+    // 支援主端點 (Power Automate) 失敗自動切換備援 (Google Apps Script) 的機制
+    async function sendPayloadToCloud(payload) {
+        try {
+            console.log("嘗試上傳至主要端點 (Power Automate)...");
+            const response = await fetch(POWER_AUTOMATE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        // Only show records which have not yet been synced
+            if (response.ok) {
+                return { success: true, provider: 'Power Automate' };
+            }
+            throw new Error(`Power Automate 回應狀態碼 ${response.status}`);
+        } catch (paErr) {
+            console.warn("Power Automate 上傳失敗，正在自動切換至 Google Apps Script 備援端點...", paErr);
+
+            try {
+                const gasResponse = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 Google Apps Script 產生 CORS 預檢錯誤
+                    body: JSON.stringify(payload)
+                });
+
+                if (gasResponse.ok) {
+                    return { success: true, provider: 'Google Apps Script (備援通道)' };
+                }
+                throw new Error(`Google Apps Script 回應狀態碼 ${gasResponse.status}`);
+            } catch (gasErr) {
+                console.error("主要與備援雲端通道皆連線失敗:", gasErr);
+                return { success: false, error: gasErr.message };
+            }
+        }
+    }
+
+    async function updateUnsyncedStats() {
+        const photos = await getAllRecords(STORES.photos);
         const pendingPhotos = photos.filter(item => !item.synced);
 
-        // Update pending count
         document.getElementById('pendingPhotosCount').textContent = pendingPhotos.length;
 
         const list = document.getElementById('pendingRecordsList');
         if (!list) return;
 
-        // Clear old display
         list.innerHTML = '';
 
-        // Nothing waiting for sync
         if (pendingPhotos.length === 0) {
             list.innerHTML = `
                 <div style="
@@ -726,7 +760,6 @@
             return;
         }
 
-        // Display every locally stored pending record
         pendingPhotos.forEach((record, index) => {
             const card = document.createElement('div');
 
@@ -792,23 +825,22 @@
                 const baseRecord = records[0];
                 const photoItems = records.map((record, index) => ({
                     photoIndex: record.photoIndex || index + 1,
-                    photoBase64: record.photoBase64 || ''
+                    photoBase64: record.photoBase64 || '',
+                    site: baseRecord.site,
+                    machine: baseRecord.machine,
+                    machineId: baseRecord.machineId,
+                    workOrder: baseRecord.workOrder,
+                    modifyDateTime: baseRecord.modifyDateTime,
+                    issueType: baseRecord.issueType,
+                    timestamp: baseRecord.timestamp
                 })).filter(item => item.photoBase64);
 
                 const payload = buildPowerAutomatePayload(baseRecord, photoItems);
 
-                if (!payload.site || !payload.machine || !payload.issueType || !payload.modifyDateTime) {
-                    console.warn('Pending local record has missing metadata:', baseRecord);
-                }
+                const result = await sendPayloadToCloud(payload);
 
-                const response = await fetch(POWER_AUTOMATE_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Power Automate returned HTTP ${response.status}`);
+                if (!result.success) {
+                    throw new Error("所有雲端端點連線失敗");
                 }
 
                 for (const record of records) {
@@ -818,7 +850,7 @@
                 }
             }
 
-            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片發送至 Power Automate。`);
+            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片透過雲端通道上傳。`);
         } catch (err) {
             alert('❌ 同步失敗: ' + err.message);
         } finally {
@@ -828,6 +860,7 @@
             checkUnsyncedCount();
         }
     }
+
     function getGpsLocation(elementId = 'cameraGpsStatus') {
         const gpsBox = document.getElementById(elementId);
         if (!gpsBox) return;
@@ -964,9 +997,6 @@
         if (!siteValue) return '';
         const value = decodeQrValue(siteValue);
 
-        // If the scanned "site" value was accidentally saved as a full URL,
-        // recover the real site parameter from that URL instead of placing
-        // the whole link into 場地名稱.
         if (/^https?:\/\//i.test(value)) {
             try {
                 const nestedUrl = new URL(value);
@@ -993,8 +1023,6 @@
         const raw = String(decodedText || '').trim();
 
         try {
-            // QR code contains a URL such as:
-            // https://aelwebapps.github.io/ESU/?site=...&machine=...&machineId=...&workOrder=...
             if (/^https?:\/\//i.test(raw)) {
                 const url = new URL(raw);
                 const params = url.searchParams;
@@ -1004,7 +1032,6 @@
                 const machineId = getQrParam(params, ['machineId', 'machineID', 'MachineID', '機器編號']);
                 const workOrder = getQrParam(params, ['workOrder', 'WorkOrder', 'wo', '工作編號']);
 
-                // Extra protection: never use the scanned URL itself as the site name.
                 site = recoverSiteFromNestedUrl(site);
 
                 applyQrFields(site, machine, machineId, workOrder);
@@ -1012,7 +1039,6 @@
                 return;
             }
 
-            // QR code contains JSON.
             const data = JSON.parse(raw);
             applyQrFields(
                 data.site || data.venue || data.Venue || data['場地名稱'],
@@ -1024,7 +1050,6 @@
             return;
 
         } catch (e) {
-            // Plain text QR code fallback: site|machine|machineId|workOrder
             const delimiter = raw.includes('|') ? '|' : (raw.includes(',') ? ',' : '\n');
             const parts = raw.split(delimiter).map(p => p.trim());
 
@@ -1262,7 +1287,7 @@
         const saveBtn = document.querySelector("#confirm .btn.primary");
         const originalText = saveBtn.textContent;
         saveBtn.disabled = true;
-        saveBtn.textContent = "⏳ 正在透過 Power Automate 上傳中...";
+        saveBtn.textContent = "⏳ 正在傳送至雲端...";
 
         const photoItems = tempPhotoArray.map((photoBase64, index) => ({
             photoIndex: index + 1,
@@ -1290,13 +1315,9 @@
                 });
             }
 
-            const response = await fetch(POWER_AUTOMATE_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const result = await sendPayloadToCloud(payload);
 
-            if (response.ok) {
+            if (result.success) {
                 const localPhotos = await getAllRecords(STORES.photos);
                 const currentSubmission = localPhotos.filter(p =>
                     !p.synced && p.timestamp === timestamp
@@ -1306,14 +1327,14 @@
                     await updateRecord(STORES.photos, p);
                 }
                 sessionStorage.removeItem('inspectionData');
-                alert("🎉 上載成功！資料與照片已成功傳送至 Power Automate 處理。");
+                alert(`🎉 上載成功！資料與照片已透過 ${result.provider} 處理。`);
                 
                 tempPhotoArray = [];
                 document.getElementById('workOrderInput').value = '';
                 
                 showPage('home');
             } else {
-                alert(`⚠️ 上傳失敗 (HTTP Status: ${response.status})。\n照片與資料已儲存至本地備份，您可以前往「雲端同步中心」重新同步。`);
+                alert(`⚠️ 上傳失敗。\n照片與資料已安全儲存至本地備份，您可以前往「雲端同步中心」隨時重新同步。`);
             }
 
         } catch (err) {
