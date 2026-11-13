@@ -158,6 +158,15 @@ This allows unsynchronized records to remain available for later upload.
       ↓
 🔄 Retry Upload
 ```
+### Fall Back
+
+```text
+❌ Upload Failed
+      ↓
+Google App Script
+      ↓
+Google Drive
+```
 
 ---
 
