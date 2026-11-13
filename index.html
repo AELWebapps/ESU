@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>AEL 維護系統 (Power Automate + Google Backup)</title>
+    <title>AEL 維護系統 (多通道上傳)</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
     <style>
@@ -251,7 +251,7 @@
     <div id="syncSettings" class="screen">
         <div class="card">
             <h3>☁️ 雲端同步中心</h3>
-            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至 Power Automate（如失敗則自動備份至 Google Drive）。</div>
+            <div class="sub-text">點擊按鈕即可將本地備份資料與照片同步至當前選擇的雲端通道。</div>
             
             <div style="font-size:14px; line-height:1.8; color:#334151; background:#e2e8f0; padding:14px; border-radius:10px; border:1px solid #cbd5e1;">
                 • 待同步工程照片/資料：<strong id="pendingPhotosCount">0</strong> 筆
@@ -381,6 +381,17 @@
                 <p style="margin:2px 0;"><strong>工作編號:</strong> <span id="summaryWo">--</span></p>
             </div>
 
+            <!-- 上傳通道切換按鈕 -->
+            <div class="label-container">
+                <span class="num-badge">🔄</span>
+                <span class="field-label">上傳通道選擇</span>
+            </div>
+            <div class="sub-text">您可以隨時切換上傳目標伺服器</div>
+            <div class="grid2" style="margin-bottom: 12px;">
+                <button type="button" id="endpointPaBtn" class="btn primary" onclick="setEndpoint('pa')">⚡ Power Automate</button>
+                <button type="button" id="endpointGasBtn" class="btn secondary" onclick="setEndpoint('gas')">🟢 Google Apps Script</button>
+            </div>
+
             <div class="label-container">
                 <span class="num-badge">📅</span>
                 <span class="field-label">修改日期時間</span>
@@ -468,11 +479,25 @@
         });
     }
 
-    // 主要端點：Power Automate
     const POWER_AUTOMATE_URL = "https://3685358de1b2e6f89344b173ee068c.8f.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/1ca055e3b77f4a08bb3f70f9f34e0aef/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=7yKFsQX_D6yiPiPIDGWCwvUCeIQL1dEVWAgf0wFf-Oc";
-    
-    // 備援端點：Google Apps Script
-    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqcSjbnvmLT4EcyTnOSBrr58Tlqh0GTjao6g_4ois-9jvKT5N6lrmpRSBxtvmSHNc4vQ/exec";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKFsOdOD_xLUx7FMN-nsEhQzHo9xEu4_UvbqNn40wKR7JjiY-I-byqRWpgl27CmcKO/exec";
+
+    // 當前選擇的上傳通道 ('pa' 代表 Power Automate, 'gas' 代表 Google Apps Script)
+    let selectedEndpoint = 'pa';
+
+    function setEndpoint(type) {
+        selectedEndpoint = type;
+        const paBtn = document.getElementById('endpointPaBtn');
+        const gasBtn = document.getElementById('endpointGasBtn');
+
+        if (type === 'pa') {
+            paBtn.className = 'btn primary';
+            gasBtn.className = 'btn secondary';
+        } else {
+            paBtn.className = 'btn secondary';
+            gasBtn.className = 'btn primary';
+        }
+    }
 
     const DB_NAME = 'AEL_MaintenanceDB';
     const DB_VERSION = 6;
@@ -668,7 +693,7 @@
         };
     }
 
-    function buildPowerAutomatePayload(data, photos) {
+    function buildPayload(data, photos) {
         const value = normalizeStoredRecord(data);
         return {
             gps: value.gps,
@@ -682,7 +707,7 @@
             photos: photos,
             checkIns: [],
 
-            // Compatibility names for existing Power Automate / Excel mappings
+            // Compatibility names
             venue: value.site,
             Venue: value.site,
             Machine: value.machine,
@@ -697,37 +722,44 @@
         };
     }
 
-    // 支援主端點 (Power Automate) 失敗自動切換備援 (Google Apps Script) 的機制
+    // 根據當前選擇的通道發送請求，若當前選的主通道失敗則自動嘗試備援通道
     async function sendPayloadToCloud(payload) {
+        const primaryUrl = (selectedEndpoint === 'pa') ? POWER_AUTOMATE_URL : APPS_SCRIPT_URL;
+        const backupUrl = (selectedEndpoint === 'pa') ? APPS_SCRIPT_URL : POWER_AUTOMATE_URL;
+        const primaryName = (selectedEndpoint === 'pa') ? 'Power Automate' : 'Google Apps Script';
+        const backupName = (selectedEndpoint === 'pa') ? 'Google Apps Script' : 'Power Automate';
+
+        const isGas = (url) => url.includes('script.google.com');
+
         try {
-            console.log("嘗試上傳至主要端點 (Power Automate)...");
-            const response = await fetch(POWER_AUTOMATE_URL, {
+            console.log(`嘗試上傳至 ${primaryName}...`);
+            const response = await fetch(primaryUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: isGas(primaryUrl) ? { 'Content-Type': 'text/plain;charset=utf-8' } : { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             if (response.ok) {
-                return { success: true, provider: 'Power Automate' };
+                return { success: true, provider: primaryName };
             }
-            throw new Error(`Power Automate 回應狀態碼 ${response.status}`);
-        } catch (paErr) {
-            console.warn("Power Automate 上傳失敗，正在自動切換至 Google Apps Script 備援端點...", paErr);
+            throw new Error(`${primaryName} HTTP Status ${response.status}`);
+        } catch (err) {
+            console.warn(`${primaryName} 失敗，正在自動嘗試備援通道 (${backupName})...`, err);
 
             try {
-                const gasResponse = await fetch(APPS_SCRIPT_URL, {
+                const backupResponse = await fetch(backupUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // 避免 Google Apps Script 產生 CORS 預檢錯誤
+                    headers: isGas(backupUrl) ? { 'Content-Type': 'text/plain;charset=utf-8' } : { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (gasResponse.ok) {
-                    return { success: true, provider: 'Google Apps Script (備援通道)' };
+                if (backupResponse.ok) {
+                    return { success: true, provider: `${backupName} (備援通道)` };
                 }
-                throw new Error(`Google Apps Script 回應狀態碼 ${gasResponse.status}`);
-            } catch (gasErr) {
-                console.error("主要與備援雲端通道皆連線失敗:", gasErr);
-                return { success: false, error: gasErr.message };
+                throw new Error(`${backupName} HTTP Status ${backupResponse.status}`);
+            } catch (backupErr) {
+                console.error("所有雲端通道皆連線失敗:", backupErr);
+                return { success: false, error: backupErr.message };
             }
         }
     }
@@ -835,12 +867,11 @@
                     timestamp: baseRecord.timestamp
                 })).filter(item => item.photoBase64);
 
-                const payload = buildPowerAutomatePayload(baseRecord, photoItems);
-
+                const payload = buildPayload(baseRecord, photoItems);
                 const result = await sendPayloadToCloud(payload);
 
                 if (!result.success) {
-                    throw new Error("所有雲端端點連線失敗");
+                    throw new Error("所有雲端通道連線失敗");
                 }
 
                 for (const record of records) {
@@ -850,7 +881,7 @@
                 }
             }
 
-            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片透過雲端通道上傳。`);
+            alert(`✅ 同步完成！\n已成功將 ${syncedCount} 筆工程照片上傳至雲端。`);
         } catch (err) {
             alert('❌ 同步失敗: ' + err.message);
         } finally {
@@ -1294,7 +1325,7 @@
             photoBase64: photoBase64
         }));
 
-        const payload = buildPowerAutomatePayload({
+        const payload = buildPayload({
             gps: serviceGpsData || { latitude: null, longitude: null, accuracy: null },
             site: formData.site,
             machine: formData.machine,
