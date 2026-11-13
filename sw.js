@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ael-maintenance-v5';
+const CACHE_NAME = 'ael-maintenance-v6';
 
 const STATIC_ASSETS = [
   './',
